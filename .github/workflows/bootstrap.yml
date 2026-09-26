@@ -1,0 +1,38 @@
+name: Bootstrap repository
+
+on:
+  push:
+    branches:
+      - feat/vertimosaic-vfl-framework
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/vertimosaic-vfl-framework
+          fetch-depth: 0
+
+      - name: Materialize VertiMosaic repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/bundle.part* | base64 -d > /tmp/vertimosaic-repo.tar.gz
+          mkdir -p /tmp/vertimosaic-repo
+          tar -xzf /tmp/vertimosaic-repo.tar.gz -C /tmp/vertimosaic-repo
+          rsync -a --delete --exclude='.git' /tmp/vertimosaic-repo/ ./
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No materialization changes to commit."
+            exit 0
+          fi
+          git commit -m "feat: implement VertiMosaic vertical FL framework"
+          git push origin HEAD:feat/vertimosaic-vfl-framework
