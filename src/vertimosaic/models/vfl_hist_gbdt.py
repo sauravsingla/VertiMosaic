@@ -244,6 +244,7 @@ class VFLHistGBDT:
 
         validation_mapping: dict[str, PassiveParty] | None = None
         validation_raw: np.ndarray | None = None
+        validation_labels: np.ndarray | None = None
         if validation_active is not None:
             validation_passive = validation_passive or []
             validation_mapping = self._party_mapping(validation_active, validation_passive)
@@ -253,6 +254,7 @@ class VFLHistGBDT:
             if any(party.n_rows != validation_n for party in validation_mapping.values()):
                 raise ValueError("validation parties must align to the same row count")
             validation_raw = np.full(validation_n, self.base_score_, dtype=float)
+            validation_labels = validation_active.labels
 
         best_loss = np.inf
         rounds_without_improvement = 0
@@ -295,12 +297,16 @@ class VFLHistGBDT:
             raw += self.learning_rate * self._predict_tree(tree, parties, n)
             self.training_loss_history_.append(_binary_log_loss(y, _sigmoid(raw)))
 
-            if validation_mapping is not None and validation_raw is not None:
+            if (
+                validation_mapping is not None
+                and validation_raw is not None
+                and validation_labels is not None
+            ):
                 validation_raw += self.learning_rate * self._predict_tree(
                     tree, validation_mapping, len(validation_raw)
                 )
                 validation_loss = _binary_log_loss(
-                    validation_active.labels,
+                    validation_labels,
                     _sigmoid(validation_raw),
                 )
                 self.validation_loss_history_.append(validation_loss)
