@@ -121,9 +121,7 @@ class VFLHistGBDT:
                 out[idx] = node.value
                 return
             assert (
-                node.party is not None
-                and node.feature is not None
-                and node.threshold is not None
+                node.party is not None and node.feature is not None and node.threshold is not None
             )
             left_idx, right_idx = parties[node.party].route(idx, node.feature, node.threshold)
             assert node.left is not None and node.right is not None

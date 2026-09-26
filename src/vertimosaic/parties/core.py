@@ -50,9 +50,7 @@ class PassiveParty(Party):
             return out
         for feature_idx in range(x.shape[1]):
             values = x[:, feature_idx]
-            quantiles = np.unique(
-                np.quantile(values, np.linspace(0.0, 1.0, max_bins + 1)[1:-1])
-            )
+            quantiles = np.unique(np.quantile(values, np.linspace(0.0, 1.0, max_bins + 1)[1:-1]))
             for threshold_idx, threshold in enumerate(quantiles):
                 left = values <= threshold
                 n_left = int(left.sum())

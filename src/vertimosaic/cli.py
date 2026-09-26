@@ -33,8 +33,7 @@ def demo(
 @app.command("report")
 def report() -> None:
     typer.echo(
-        "Reporting primitives are available; "
-        "run an experiment to generate measured outputs."
+        "Reporting primitives are available; run an experiment to generate measured outputs."
     )
 
 
