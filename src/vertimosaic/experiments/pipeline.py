@@ -14,6 +14,7 @@ from vertimosaic.datasets import make_vertical_synthetic
 from vertimosaic.evaluation import (
     binary_metrics,
     bootstrap_confidence_intervals,
+    confusion_at_threshold,
     entity_level_split,
     paired_bootstrap_difference,
     select_f1_threshold,
@@ -33,11 +34,22 @@ def slice_parties(
     )
 
 
-def _make_model(model_name: str) -> VFLLogisticRegression | VFLHistGBDT:
+def _make_model(model_name: str, seed: int) -> VFLLogisticRegression | VFLHistGBDT:
     if model_name == "logistic":
-        return VFLLogisticRegression(learning_rate=0.08, max_iter=500, l2=1e-3)
+        return VFLLogisticRegression(
+            learning_rate=0.08,
+            max_iter=500,
+            l2=1e-3,
+            seed=seed,
+        )
     if model_name == "vfl-hist-gbdt":
-        return VFLHistGBDT(n_estimators=20, max_depth=3, min_samples_leaf=20)
+        return VFLHistGBDT(
+            n_estimators=20,
+            max_depth=3,
+            min_samples_leaf=20,
+            early_stopping_rounds=3,
+            seed=seed,
+        )
     raise ValueError(f"unknown model: {model_name}")
 
 
@@ -50,7 +62,15 @@ def _training_frame(model: VFLLogisticRegression | VFLHistGBDT) -> pd.DataFrame:
         return pd.DataFrame(
             {"iteration": np.arange(len(model.loss_history_)), "loss": model.loss_history_}
         )
-    return pd.DataFrame({"tree": np.arange(len(model.trees_))})
+    frame = pd.DataFrame(
+        {
+            "tree": np.arange(len(model.training_loss_history_)),
+            "training_loss": model.training_loss_history_,
+        }
+    )
+    if model.validation_loss_history_:
+        frame["validation_loss"] = model.validation_loss_history_[: len(frame)]
+    return frame
 
 
 def _synthetic_provenance(active: ActiveParty, passive: list[PassiveParty]) -> pd.DataFrame:
@@ -86,11 +106,14 @@ def run_synthetic_experiment(
     train_active, train_passive = slice_parties(active, passive, split.train)
     val_active, val_passive = slice_parties(active, passive, split.validation)
     test_active, test_passive = slice_parties(active, passive, split.test)
-    model = _make_model(model_name)
+    model = _make_model(model_name, seed)
     process = psutil.Process()
     rss_before = process.memory_info().rss
     start = time.perf_counter()
-    model.fit(train_active, train_passive)
+    if isinstance(model, VFLHistGBDT):
+        model.fit(train_active, train_passive, val_active, val_passive)
+    else:
+        model.fit(train_active, train_passive)
     training_seconds = time.perf_counter() - start
     peak_rss_bytes = max(rss_before, process.memory_info().rss)
     val_p = model.predict_proba([val_active, *val_passive])[:, 1]
@@ -107,22 +130,40 @@ def run_synthetic_experiment(
         seed=seed,
     )
     baseline_name = "logistic" if model_name == "logistic" else "hist-gbdt"
-    baseline = fit_centralized_baseline(
+    bank_baseline = fit_centralized_baseline(
         [train_active._x],
         train_active.labels,
         [test_active._x],
         model=baseline_name,
         seed=seed,
     )
-    comparison = paired_bootstrap_difference(
+    all_party_baseline = fit_centralized_baseline(
+        [train_active._x, *[party._x for party in train_passive]],
+        train_active.labels,
+        [test_active._x, *[party._x for party in test_passive]],
+        model=baseline_name,
+        seed=seed,
+    )
+    bank_comparison = paired_bootstrap_difference(
         test_active.labels,
         test_p,
-        baseline.probabilities,
+        bank_baseline.probabilities,
         metric="roc_auc",
         threshold=threshold,
         replicates=bootstrap_replicates,
         seed=seed,
     )
+    bank_comparison["baseline"] = "bank_only_non_federated"
+    all_party_comparison = paired_bootstrap_difference(
+        test_active.labels,
+        test_p,
+        all_party_baseline.probabilities,
+        metric="roc_auc",
+        threshold=threshold,
+        replicates=bootstrap_replicates,
+        seed=seed,
+    )
+    all_party_comparison["baseline"] = "centralized_all_party_non_federated"
     payload: dict[str, Any] = {
         "mode": "synthetic_scale",
         "model": model_name,
@@ -130,8 +171,9 @@ def run_synthetic_experiment(
         "seed": seed,
         "threshold": threshold,
         "metrics": metrics,
+        "confusion_matrix": confusion_at_threshold(test_active.labels, test_p, threshold),
         "confidence_intervals": intervals,
-        "comparisons": [comparison],
+        "comparisons": [bank_comparison, all_party_comparison],
         "training_seconds": training_seconds,
         "inference_seconds": inference_seconds,
         "peak_rss_bytes": int(peak_rss_bytes),
