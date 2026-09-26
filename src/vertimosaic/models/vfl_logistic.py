@@ -141,10 +141,7 @@ class VFLLogisticRegression:
                 break
             previous = loss
 
-            if batch_size == n:
-                order = np.arange(n, dtype=int)
-            else:
-                order = rng.permutation(n)
+            order = np.arange(n, dtype=int) if batch_size == n else rng.permutation(n)
             rate = self._epoch_learning_rate(epoch)
             for start in range(0, n, batch_size):
                 batch = order[start : start + batch_size]
