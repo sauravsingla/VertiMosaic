@@ -105,9 +105,7 @@ def run_missing_party_methods_study(
     for method in _METHODS:
         prepared = prepare_missing_party_method(active, passive, masks, method)
         split = entity_level_split(prepared.active.labels, seed=seed)
-        train_active, train_passive = slice_parties(
-            prepared.active, prepared.passive, split.train
-        )
+        train_active, train_passive = slice_parties(prepared.active, prepared.passive, split.train)
         test_active, test_passive = slice_parties(prepared.active, prepared.passive, split.test)
         model = VFLLogisticRegression(learning_rate=0.08, max_iter=350, l2=1e-3, seed=seed)
         model.fit(train_active, train_passive)
