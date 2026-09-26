@@ -127,6 +127,7 @@ class VFLHistGBDT:
         depth: int,
         rng: np.random.Generator,
         leaf_count: list[int],
+        tree_index: int,
     ) -> TreeNode:
         node = TreeNode(indices=indices.copy(), depth=depth)
         node.value = self._leaf_value(gradients, hessians, indices)
@@ -154,6 +155,9 @@ class VFLHistGBDT:
                 message_type="candidate_histogram_metadata",
                 sender_role=party.name,
                 receiver_role="active",
+                direction="forward",
+                stage="tree",
+                step=tree_index,
             )
             for cand in candidates:
                 gain = self._split_gain(cand)
@@ -171,6 +175,9 @@ class VFLHistGBDT:
             message_type="partition_routing_counts",
             sender_role=party.name,
             receiver_role="active",
+            direction="forward",
+            stage="tree",
+            step=tree_index,
         )
         if len(left_idx) < self.min_samples_leaf or len(right_idx) < self.min_samples_leaf:
             return node
@@ -180,10 +187,24 @@ class VFLHistGBDT:
         node.gain = float(best_gain)
         leaf_count[0] += 1
         node.left = self._build_node(
-            parties, gradients, hessians, left_idx, depth + 1, rng, leaf_count
+            parties,
+            gradients,
+            hessians,
+            left_idx,
+            depth + 1,
+            rng,
+            leaf_count,
+            tree_index,
         )
         node.right = self._build_node(
-            parties, gradients, hessians, right_idx, depth + 1, rng, leaf_count
+            parties,
+            gradients,
+            hessians,
+            right_idx,
+            depth + 1,
+            rng,
+            leaf_count,
+            tree_index,
         )
         return node
 
@@ -233,6 +254,7 @@ class VFLHistGBDT:
         parties = {party.name: party for party in party_list}
         self.party_names_ = list(parties)
         y = active.labels
+        prevalence = np.clip(y.mean(), 1e-6, 1.0 - prevalence if False else 1.0 - y.mean())
         prevalence = np.clip(y.mean(), 1e-6, 1.0 - 1e-6)
         self.base_score_ = float(np.log(prevalence / (1.0 - prevalence)))
         raw = np.full(n, self.base_score_, dtype=float)
@@ -259,7 +281,7 @@ class VFLHistGBDT:
         best_loss = np.inf
         rounds_without_improvement = 0
         best_tree_count = 0
-        for _ in range(self.n_estimators):
+        for tree_index in range(self.n_estimators):
             probability = _sigmoid(raw)
             gradients = probability - y
             hessians = np.maximum(probability * (1.0 - probability), 1e-8)
@@ -268,12 +290,18 @@ class VFLHistGBDT:
                 message_type="gradients",
                 sender_role="active",
                 receiver_role="passive_parties",
+                direction="backward",
+                stage="tree",
+                step=tree_index,
             )
             self.transport.send(
                 hessians,
                 message_type="hessians",
                 sender_role="active",
                 receiver_role="passive_parties",
+                direction="backward",
+                stage="tree",
+                step=tree_index,
             )
             if self.subsample >= 1.0:
                 tree_indices = np.arange(n, dtype=int)
@@ -292,6 +320,7 @@ class VFLHistGBDT:
                 0,
                 rng,
                 [1],
+                tree_index,
             )
             self.trees_.append(tree)
             raw += self.learning_rate * self._predict_tree(tree, parties, n)
