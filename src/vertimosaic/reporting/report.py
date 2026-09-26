@@ -108,7 +108,9 @@ def build_data_driven_report(
         )
     )
     if "training_steps" in payload:
-        observations.append(f"Training completed with {int(payload['training_steps'])} epochs/trees.")
+        observations.append(
+            f"Training completed with {int(payload['training_steps'])} epochs/trees."
+        )
 
     artifact_status: dict[str, bool] = {}
     overlap = _read_csv(results_directory / "partial_overlap.csv")
