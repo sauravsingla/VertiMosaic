@@ -120,11 +120,11 @@ class VFLHistGBDT:
             if node.is_leaf:
                 out[idx] = node.value
                 return
-            assert (
-                node.party is not None and node.feature is not None and node.threshold is not None
-            )
+            if node.party is None or node.feature is None or node.threshold is None:
+                raise RuntimeError("non-leaf node is missing split metadata")
             left_idx, right_idx = parties[node.party].route(idx, node.feature, node.threshold)
-            assert node.left is not None and node.right is not None
+            if node.left is None or node.right is None:
+                raise RuntimeError("non-leaf node is missing child nodes")
             walk(node.left, left_idx)
             walk(node.right, right_idx)
 
