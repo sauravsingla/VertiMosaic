@@ -149,8 +149,7 @@ def prepare_bank_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, list[FeatureP
 
 def _resolve_columns(frame: pd.DataFrame) -> dict[str, str]:
     return {
-        str(column).strip().casefold().replace(" ", ""): str(column)
-        for column in frame.columns
+        str(column).strip().casefold().replace(" ", ""): str(column) for column in frame.columns
     }
 
 
@@ -348,8 +347,8 @@ def prepare_retail_transactions(
     frame["Quantity"] = pd.to_numeric(frame["Quantity"], errors="coerce")
     frame["UnitPrice"] = pd.to_numeric(frame["UnitPrice"], errors="coerce")
     frame["line_value"] = frame["Quantity"] * frame["UnitPrice"]
-    frame["cancelled"] = (
-        frame["InvoiceNo"].astype(str).str.startswith("C") | (frame["Quantity"] < 0)
+    frame["cancelled"] = frame["InvoiceNo"].astype(str).str.startswith("C") | (
+        frame["Quantity"] < 0
     )
     grouped = frame.groupby("CustomerID", sort=True)
     output = pd.DataFrame(
@@ -485,9 +484,7 @@ def save_bundle(bundle: ExternalDatasetBundle, directory: Path) -> dict[str, str
     provenance_path = directory / f"{bundle.party}_feature_provenance.csv"
     metadata_path = directory / f"{bundle.party}_metadata.json"
     bundle.features.to_parquet(features_path, index=False)
-    pd.DataFrame([asdict(item) for item in bundle.provenance]).to_csv(
-        provenance_path, index=False
-    )
+    pd.DataFrame([asdict(item) for item in bundle.provenance]).to_csv(provenance_path, index=False)
     metadata_path.write_text(
         json.dumps(bundle.metadata, indent=2, sort_keys=True, default=str) + "\n",
         encoding="utf-8",
