@@ -16,9 +16,7 @@ def _sigmoid(x: np.ndarray) -> np.ndarray:
 def _binary_log_loss(y: np.ndarray, probability: np.ndarray) -> float:
     eps = 1e-12
     probability = np.clip(probability, eps, 1.0 - eps)
-    return float(
-        -np.mean(y * np.log(probability) + (1.0 - y) * np.log(1.0 - probability))
-    )
+    return float(-np.mean(y * np.log(probability) + (1.0 - y) * np.log(1.0 - probability)))
 
 
 @dataclass
