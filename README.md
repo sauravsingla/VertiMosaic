@@ -21,49 +21,100 @@ VertiMosaic is an open-source research framework for training machine-learning m
 **Cross-industry linkage:** Explicitly semi-synthetic  
 **Reference implementation:** NumPy/scikit-learn ecosystem
 
-VertiMosaic distinguishes carefully between data locality, pseudonymization, synthetic linkage and cryptographic privacy guarantees.
+VertiMosaic distinguishes carefully between data locality, pseudonymization, synthetic linkage, and cryptographic privacy guarantees.
 
-## What VertiMosaic is
+## True vertical federated learning
 
-Vertical federated learning (VFL) assumes the same or overlapping entities are represented across parties, while each party owns different feature columns. VertiMosaic models that column-partitioned setting. Raw passive-party feature tables remain inside `PassiveParty` objects and are not concatenated during federated training.
+Horizontal FL generally trains across different entities that share a similar feature schema. Vertical FL aligns the same or overlapping entities while parties own different feature columns. VertiMosaic implements the latter. During federated training, passive-party raw feature matrices remain inside their party objects and are not pooled into the Bank.
 
-The four primary public data sources used by the external benchmark do **not** describe the same real people. The cross-industry benchmark is therefore described as an **externally grounded semi-synthetic cross-industry VFL benchmark**. Linkage is target-blind in observed-target mode.
+The four primary public sources do **not** describe the same real people. The four-industry benchmark is therefore an **externally grounded semi-synthetic cross-industry VFL benchmark**. In observed-target mode, linkage is target-blind. In distributed-signal mode, the target is generated only after linked profiles are formed.
 
-## What VertiMosaic is not
+## Privacy boundary
 
-The default simulator is not cryptographically secure VFL. It provides raw-feature locality, local preprocessing, protocol separation and pseudonymous identifiers. It does not automatically provide PSI, MPC, homomorphic encryption, collusion resistance, malicious-party security, formal differential privacy, or protection against all gradient/routing leakage.
+The default simulator provides raw-feature locality, party-local computation/preprocessing, explicit protocol boundaries, metadata-only communication auditing, and research pseudonymization. It is **not cryptographically secure VFL** and does not automatically provide PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, malicious-party security, or formal differential privacy. Gradients, Hessians, local logits, residuals, entity membership, and routing information may leak information. See `docs/threat_model.md` and `docs/privacy_boundaries.md`.
 
 ## Quick start
 
 ```bash
 python -m pip install -e .
+vertimosaic --help
 vertimosaic demo --rows 2000 --seed 42
 ```
 
-Run checks:
+Reference commands:
+
+```bash
+vertimosaic datasets list
+vertimosaic datasets download bank
+vertimosaic datasets download-all
+vertimosaic prepare-external
+vertimosaic generate-synthetic
+vertimosaic train --model logistic
+vertimosaic train --model vfl-hist-gbdt
+vertimosaic evaluate
+vertimosaic ablation
+vertimosaic contribution
+vertimosaic overlap
+vertimosaic dropout
+vertimosaic drift
+vertimosaic benchmark
+vertimosaic report
+vertimosaic external-demo --model vfl-hist-gbdt --seed 42
+```
+
+Optional IEEE-CIS files are authorized local inputs only:
+
+```bash
+vertimosaic prepare-ieee-cis \
+  --transaction /path/to/train_transaction.csv \
+  --identity /path/to/train_identity.csv
+```
+
+## Reference algorithms
+
+`VFLLogisticRegression` is the first-principles NumPy reference protocol. Each party computes local logits and local gradients over only its own features. `VFLHistGBDT` is a CPU vertical histogram-gradient-boosting research implementation in which parties compute local candidate statistics and the owning party performs routing.
+
+Centralized models exist only as **NON-FEDERATED BASELINES** for research comparison and are never relabelled as VFL.
+
+## Benchmark modes
+
+- `observed_target_external`: Bank is the anchor population and uses the published observed default target; external profiles are linked target-blind.
+- `distributed_signal_external`: real transformed source-domain features are linked first, then a clearly disclosed semi-synthetic target depends on all four parties.
+- `synthetic_scale`: fully controlled scaling, overlap, dropout, drift, noise, and distributed-signal experiments.
+- `ieee_cis_linked`: optional genuinely linked local benchmark when authorized IEEE-CIS transaction and identity files are supplied.
+
+## External data and provenance
+
+The primary sources are UCI Default of Credit Card Clients (350), UCI Iranian Churn (563), OpenML `freMTPL2freq` (41214) / `freMTPL2sev` (41215), and UCI Online Retail (352). Retail is aggregated to customer level before VFL and uses temporal cutoffs to prevent future-data leakage. Source-code licensing does not relicense datasets; see `DATA_LICENSES.md`.
+
+Full experiment runs can record configuration, dataset/linkage provenance, environment, predictions, training history, communication metadata, and feature provenance under `runs/<run_id>/`.
+
+## Evaluation and scientific honesty
+
+Entity-level splits default to 70% train, 15% validation, and 15% test. Threshold selection uses validation data only. Test evaluation supports ROC-AUC, PR-AUC, precision, recall, F1, balanced accuracy, log loss, Brier score, ECE, confusion counts, deterministic bootstrap intervals, and paired bootstrap differences.
+
+No benchmark conclusion is hard-coded. Negative and uncertain findings are retained. Communication quantities are **simulated payload estimates**, not measured network traffic or latency. Result tables and reports should be generated from measured artifacts rather than manually typed metric values.
+
+## Verification
 
 ```bash
 ruff check .
 ruff format --check .
 mypy src/vertimosaic
-pytest -q
+pytest -q --cov=vertimosaic --cov-report=term-missing
+bandit -r src
+pip-audit
+vertimosaic demo --rows 2000 --seed 42
 python -m build
 twine check dist/*
 ```
 
-## Reference algorithms
+Protocol-critical modules target at least 90% coverage; coverage is not inflated merely to chase 100%.
 
-1. **VFLLogisticRegression** — first-principles NumPy vertical logistic regression. Each party computes local logits and gradients over its own features.
-2. **VFLHistGBDT** — CPU histogram-based vertical gradient boosting research implementation. Parties compute local candidate histogram statistics; the active party chooses a split, and the owning party returns routing only.
+## Documentation
 
-## External data
-
-See [DATA_LICENSES.md](DATA_LICENSES.md). Source-code licensing does not relicense any dataset. IEEE-CIS is optional, local-only, and never redistributed.
-
-## Scientific honesty
-
-Generated metrics are written by experiment code. Documentation does not hard-code claims that VFL improves performance. Negative findings are retained. Communication numbers are simulated payload estimates, not measured network traffic.
+See `docs/architecture.md`, `docs/protocol.md`, `docs/vertical_vs_horizontal_fl.md`, `docs/datasets.md`, `docs/linkage.md`, `docs/privacy_boundaries.md`, `docs/threat_model.md`, `docs/reproducibility.md`, `docs/limitations.md`, and `paper/experiment_manifest.md`.
 
 ## License
 
-Source code: Apache-2.0. Dataset licenses remain with their providers.
+VertiMosaic source code is licensed under Apache-2.0. Dataset licenses and provider terms remain separate.

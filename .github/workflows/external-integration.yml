@@ -1,0 +1,22 @@
+name: External data integration
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "31 3 * * 6"
+jobs:
+  external-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - name: Verify public dataset metadata
+        run: vertimosaic datasets list
+      - name: External Bank + Telecom preparation smoke
+        run: |
+          vertimosaic datasets download bank --output /tmp/vertimosaic-data
+          vertimosaic datasets download telecom --output /tmp/vertimosaic-data
