@@ -129,8 +129,7 @@ class VFLLogisticRegression:
                 weights=sample_weight,
             )
             penalty = sum(
-                0.5 * self.l2 * float(weights @ weights)
-                + self.l1 * float(np.abs(weights).sum())
+                0.5 * self.l2 * float(weights @ weights) + self.l1 * float(np.abs(weights).sum())
                 for weights in self.weights_.values()
             )
             loss = float(data_loss + penalty)
