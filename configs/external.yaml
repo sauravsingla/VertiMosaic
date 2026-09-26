@@ -1,0 +1,5 @@
+seed: 42
+benchmark_mode: observed_target_external
+cross_party_correlation: 0.25
+linkage: rank_gaussian_copula_nearest_donor
+insurance_sample_size: 30000

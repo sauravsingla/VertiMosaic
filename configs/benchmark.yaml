@@ -1,0 +1,3 @@
+seed: 42
+rows: [10000, 30000, 50000, 100000]
+models: [logistic, vfl-hist-gbdt]

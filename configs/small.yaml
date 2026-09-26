@@ -1,0 +1,5 @@
+seed: 42
+rows: 2000
+model: logistic
+epochs: 30
+batch_size: 256
