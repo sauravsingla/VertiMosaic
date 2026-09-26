@@ -13,6 +13,10 @@ from vertimosaic.experiments.missing_parties import (
     prepare_missing_party_method,
     run_missing_party_methods_study,
 )
+from vertimosaic.experiments.paper_artifacts import (
+    build_main_results_table,
+    generate_publication_artifacts,
+)
 from vertimosaic.experiments.pipeline import run_synthetic_experiment
 from vertimosaic.experiments.robustness import (
     AvailabilityMasks,
@@ -35,9 +39,11 @@ __all__ = [
     "MissingPartyPrepared",
     "apply_categorical_frequency_drift",
     "apply_numeric_drift",
+    "build_main_results_table",
     "dropout_scenarios",
     "enumerate_party_subsets",
     "exact_shapley_party_utility",
+    "generate_publication_artifacts",
     "make_availability_masks",
     "prepare_external_benchmark",
     "prepare_ieee_cis",
