@@ -1,3 +1,8 @@
+from vertimosaic.reporting.feature_importance import (
+    gbdt_local_feature_importance,
+    logistic_local_feature_importance,
+    write_party_feature_importance,
+)
 from vertimosaic.reporting.interpreter import (
     comparison_observation,
     interpret_calibration,
@@ -9,8 +14,11 @@ from vertimosaic.reporting.report import build_data_driven_report, write_final_r
 __all__ = [
     "build_data_driven_report",
     "comparison_observation",
+    "gbdt_local_feature_importance",
     "interpret_calibration",
     "interpret_costs",
     "interpret_delta",
+    "logistic_local_feature_importance",
     "write_final_report",
+    "write_party_feature_importance",
 ]
