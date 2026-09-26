@@ -14,6 +14,8 @@ from vertimosaic.datasets import make_vertical_synthetic
 from vertimosaic.evaluation import (
     binary_metrics,
     bootstrap_confidence_intervals,
+    communication_event_frame,
+    communication_totals,
     confusion_at_threshold,
     entity_level_split,
     paired_bootstrap_difference,
@@ -54,7 +56,7 @@ def _make_model(model_name: str, seed: int) -> VFLLogisticRegression | VFLHistGB
 
 
 def _communication_frame(model: VFLLogisticRegression | VFLHistGBDT) -> pd.DataFrame:
-    return pd.DataFrame([asdict(event) for event in model.transport.audit_log])
+    return communication_event_frame(model.transport.audit_log)
 
 
 def _training_frame(model: VFLLogisticRegression | VFLHistGBDT) -> pd.DataFrame:
@@ -101,7 +103,9 @@ def run_synthetic_experiment(
     write_run: bool = False,
     runs_root: Path = Path("runs"),
 ) -> dict[str, Any]:
+    preparation_start = time.perf_counter()
     active, passive = make_vertical_synthetic(rows, seed)
+    data_preparation_seconds = time.perf_counter() - preparation_start
     split = entity_level_split(active.labels, seed=seed)
     train_active, train_passive = slice_parties(active, passive, split.train)
     val_active, val_passive = slice_parties(active, passive, split.validation)
@@ -164,6 +168,8 @@ def run_synthetic_experiment(
         seed=seed,
     )
     all_party_comparison["baseline"] = "centralized_all_party_non_federated"
+    communication = communication_totals(model.transport.audit_log)
+    training_steps = model.n_iter_ if isinstance(model, VFLLogisticRegression) else len(model.trees_)
     payload: dict[str, Any] = {
         "mode": "synthetic_scale",
         "model": model_name,
@@ -174,10 +180,15 @@ def run_synthetic_experiment(
         "confusion_matrix": confusion_at_threshold(test_active.labels, test_p, threshold),
         "confidence_intervals": intervals,
         "comparisons": [bank_comparison, all_party_comparison],
+        "data_preparation_seconds": data_preparation_seconds,
+        "entity_alignment_seconds": None,
+        "preprocessing_seconds": None,
         "training_seconds": training_seconds,
         "inference_seconds": inference_seconds,
+        "training_steps": training_steps,
         "peak_rss_bytes": int(peak_rss_bytes),
         "estimated_communication_bytes": int(model.transport.estimated_payload_bytes),
+        "communication": communication,
     }
     if write_run:
         run = RunArtifacts.create(root=runs_root)
