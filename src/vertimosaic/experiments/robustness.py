@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import pandas as pd
 
 _PARTIES = ("bank", "telecom", "insurance", "retail")
 
@@ -64,6 +65,47 @@ def apply_numeric_drift(
         mask = rng.random(out.shape) < missingness_increase
         out[mask] = np.nan
     return out
+
+
+def apply_categorical_frequency_drift(
+    values: np.ndarray,
+    *,
+    strength: float = 0.25,
+    seed: int = 42,
+) -> np.ndarray:
+    """Shift category frequencies toward each column's dominant observed category.
+
+    ``strength=0`` preserves the empirical sampling distribution and
+    ``strength=1`` puts all sampled non-missing values on the dominant category.
+    The operation is deterministic for a fixed seed and does not mutate the input.
+    """
+    if not 0.0 <= strength <= 1.0:
+        raise ValueError("categorical drift strength must be in [0, 1]")
+    original = np.asarray(values, dtype=object)
+    squeeze = original.ndim == 1
+    if original.ndim not in {1, 2}:
+        raise ValueError("categorical drift accepts one- or two-dimensional arrays")
+    matrix = original.reshape(-1, 1).copy() if squeeze else original.copy()
+    rng = np.random.default_rng(seed)
+    for column_index in range(matrix.shape[1]):
+        column = pd.Series(matrix[:, column_index], dtype="object")
+        observed = column.dropna()
+        if observed.empty:
+            continue
+        counts = observed.value_counts(sort=False)
+        categories = counts.index.to_numpy(dtype=object)
+        empirical = counts.to_numpy(dtype=float)
+        empirical /= empirical.sum()
+        dominant = int(np.argmax(empirical))
+        shifted = (1.0 - strength) * empirical
+        shifted[dominant] += strength
+        non_missing = column.notna().to_numpy()
+        matrix[non_missing, column_index] = rng.choice(
+            categories,
+            size=int(non_missing.sum()),
+            p=shifted,
+        )
+    return matrix[:, 0] if squeeze else matrix
 
 
 def dropout_scenarios() -> dict[str, tuple[str, ...]]:
