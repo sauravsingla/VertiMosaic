@@ -87,10 +87,7 @@ def paired_bootstrap_difference(
         y_b = y[idx]
         if metric in {"roc_auc", "pr_auc"} and np.unique(y_b).size < 2:
             continue
-        deltas.append(
-            _metric(metric, y_b, a[idx], threshold)
-            - _metric(metric, y_b, b[idx], threshold)
-        )
+        deltas.append(_metric(metric, y_b, a[idx], threshold) - _metric(metric, y_b, b[idx], threshold))
     low, high = _interval(deltas)
     point = _metric(metric, y, a, threshold) - _metric(metric, y, b, threshold)
     return {
