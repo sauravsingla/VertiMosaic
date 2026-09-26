@@ -254,7 +254,6 @@ class VFLHistGBDT:
         parties = {party.name: party for party in party_list}
         self.party_names_ = list(parties)
         y = active.labels
-        prevalence = np.clip(y.mean(), 1e-6, 1.0 - prevalence if False else 1.0 - y.mean())
         prevalence = np.clip(y.mean(), 1e-6, 1.0 - 1e-6)
         self.base_score_ = float(np.log(prevalence / (1.0 - prevalence)))
         raw = np.full(n, self.base_score_, dtype=float)
