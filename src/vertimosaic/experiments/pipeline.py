@@ -169,7 +169,9 @@ def run_synthetic_experiment(
     )
     all_party_comparison["baseline"] = "centralized_all_party_non_federated"
     communication = communication_totals(model.transport.audit_log)
-    training_steps = model.n_iter_ if isinstance(model, VFLLogisticRegression) else len(model.trees_)
+    training_steps = (
+        model.n_iter_ if isinstance(model, VFLLogisticRegression) else len(model.trees_)
+    )
     payload: dict[str, Any] = {
         "mode": "synthetic_scale",
         "model": model_name,
