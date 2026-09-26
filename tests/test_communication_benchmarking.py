@@ -1,6 +1,10 @@
 import numpy as np
 
-from vertimosaic.evaluation import communication_breakdown, communication_event_frame, communication_totals
+from vertimosaic.evaluation import (
+    communication_breakdown,
+    communication_event_frame,
+    communication_totals,
+)
 from vertimosaic.transport import InMemoryTransport
 
 
@@ -37,4 +41,8 @@ def test_communication_benchmarking_tracks_metadata_without_payload_values() -> 
     assert totals["backward_message_count"] == 1
     assert totals["traffic_type"] == "SIMULATED PAYLOAD SIZE"
     assert breakdown["estimated_bytes"].sum() == totals["estimated_bytes"]
-    assert not any(isinstance(value, np.ndarray) for event in transport.audit_log for value in vars(event).values())
+    assert not any(
+        isinstance(value, np.ndarray)
+        for event in transport.audit_log
+        for value in vars(event).values()
+    )
