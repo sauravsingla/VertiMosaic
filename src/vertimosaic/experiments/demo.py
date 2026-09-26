@@ -4,10 +4,9 @@ import json
 from pathlib import Path
 
 import numpy as np
-from sklearn.model_selection import train_test_split
 
 from vertimosaic.datasets import make_vertical_synthetic
-from vertimosaic.evaluation import binary_metrics
+from vertimosaic.evaluation import binary_metrics, entity_level_split, select_f1_threshold
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
 
@@ -21,13 +20,12 @@ def _slice(
 
 
 def run_demo(rows: int = 2000, seed: int = 42, model_name: str = "logistic") -> dict[str, float]:
+    """CPU-friendly smoke demo using one entity split shared across all parties."""
     active, passive = make_vertical_synthetic(rows, seed)
-    indices = np.arange(rows)
-    train_idx, test_idx = train_test_split(
-        indices, test_size=0.30, random_state=seed, stratify=active.labels
-    )
-    train_active, train_passive = _slice(active, passive, train_idx)
-    test_active, test_passive = _slice(active, passive, test_idx)
+    split = entity_level_split(active.labels, seed=seed)
+    train_active, train_passive = _slice(active, passive, split.train)
+    validation_active, validation_passive = _slice(active, passive, split.validation)
+    test_active, test_passive = _slice(active, passive, split.test)
     model: VFLLogisticRegression | VFLHistGBDT
     if model_name == "logistic":
         model = VFLLogisticRegression(learning_rate=0.08, max_iter=500, l2=1e-3)
@@ -36,8 +34,11 @@ def run_demo(rows: int = 2000, seed: int = 42, model_name: str = "logistic") -> 
     else:
         raise ValueError(f"unknown model: {model_name}")
     model.fit(train_active, train_passive)
-    p = model.predict_proba([test_active, *test_passive])[:, 1]
-    metrics = binary_metrics(test_active.labels, p)
+    validation_p = model.predict_proba([validation_active, *validation_passive])[:, 1]
+    threshold = select_f1_threshold(validation_active.labels, validation_p)
+    test_p = model.predict_proba([test_active, *test_passive])[:, 1]
+    metrics = binary_metrics(test_active.labels, test_p, threshold=threshold)
+    metrics["threshold_selected_on_validation"] = threshold
     metrics["estimated_communication_bytes"] = float(model.transport.estimated_payload_bytes)
     return metrics
 
