@@ -3,6 +3,7 @@ from vertimosaic.experiments.contribution import (
     enumerate_party_subsets,
     exact_shapley_party_utility,
 )
+from vertimosaic.experiments.contribution_study import run_contribution_study
 from vertimosaic.experiments.demo import run_demo, write_demo_report
 from vertimosaic.experiments.external import ExternalBenchmark, prepare_external_benchmark
 from vertimosaic.experiments.external_run import run_external_experiment
@@ -21,7 +22,6 @@ from vertimosaic.experiments.robustness import (
 )
 from vertimosaic.experiments.studies import (
     run_ablation_study,
-    run_contribution_study,
     run_drift_study,
     run_dropout_study,
     run_overlap_study,
