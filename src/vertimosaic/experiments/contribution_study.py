@@ -22,7 +22,11 @@ def _passive_map(items: list[PassiveParty]) -> dict[str, PassiveParty]:
     return {item.name: item for item in items}
 
 
-def _fit_logistic(active: ActiveParty, passive: list[PassiveParty], seed: int) -> VFLLogisticRegression:
+def _fit_logistic(
+    active: ActiveParty,
+    passive: list[PassiveParty],
+    seed: int,
+) -> VFLLogisticRegression:
     model = VFLLogisticRegression(
         learning_rate=0.08,
         max_iter=300,
