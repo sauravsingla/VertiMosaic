@@ -16,6 +16,7 @@ from vertimosaic.experiments.missing_parties import (
 from vertimosaic.experiments.pipeline import run_synthetic_experiment
 from vertimosaic.experiments.robustness import (
     AvailabilityMasks,
+    apply_categorical_frequency_drift,
     apply_numeric_drift,
     dropout_scenarios,
     make_availability_masks,
@@ -32,6 +33,7 @@ __all__ = [
     "ExternalBenchmark",
     "IEEECISPrepared",
     "MissingPartyPrepared",
+    "apply_categorical_frequency_drift",
     "apply_numeric_drift",
     "dropout_scenarios",
     "enumerate_party_subsets",
