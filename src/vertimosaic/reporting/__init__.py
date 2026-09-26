@@ -1,3 +1,4 @@
+from vertimosaic.reporting.case_study import select_sanitized_case_study
 from vertimosaic.reporting.feature_importance import (
     gbdt_local_feature_importance,
     logistic_local_feature_importance,
@@ -19,6 +20,7 @@ __all__ = [
     "interpret_costs",
     "interpret_delta",
     "logistic_local_feature_importance",
+    "select_sanitized_case_study",
     "write_final_report",
     "write_party_feature_importance",
 ]
