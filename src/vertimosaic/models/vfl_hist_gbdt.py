@@ -299,7 +299,10 @@ class VFLHistGBDT:
                 validation_raw += self.learning_rate * self._predict_tree(
                     tree, validation_mapping, len(validation_raw)
                 )
-                validation_loss = _binary_log_loss(validation_active.labels, _sigmoid(validation_raw))
+                validation_loss = _binary_log_loss(
+                    validation_active.labels,
+                    _sigmoid(validation_raw),
+                )
                 self.validation_loss_history_.append(validation_loss)
                 if validation_loss < best_loss - 1e-12:
                     best_loss = validation_loss
