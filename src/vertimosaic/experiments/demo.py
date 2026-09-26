@@ -28,6 +28,7 @@ def run_demo(rows: int = 2000, seed: int = 42, model_name: str = "logistic") -> 
     )
     train_active, train_passive = _slice(active, passive, train_idx)
     test_active, test_passive = _slice(active, passive, test_idx)
+    model: VFLLogisticRegression | VFLHistGBDT
     if model_name == "logistic":
         model = VFLLogisticRegression(learning_rate=0.08, max_iter=500, l2=1e-3)
     elif model_name == "vfl-hist-gbdt":
