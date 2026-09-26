@@ -43,9 +43,9 @@ def _link_passive(
     seed: int,
 ) -> tuple[np.ndarray, LinkageManifest]:
     donor_matrix = _numeric_matrix(bundle.features)
-    result = GaussianCopulaLinker(
-        cross_party_correlation=correlation, seed=seed
-    ).link(anchor_matrix, donor_matrix)
+    result = GaussianCopulaLinker(cross_party_correlation=correlation, seed=seed).link(
+        anchor_matrix, donor_matrix
+    )
     linked = donor_matrix[result.donor_indices]
     manifest = LinkageManifest(
         method="gaussian_copula_rank_proximity",
@@ -83,9 +83,7 @@ def prepare_external_benchmark(
         )
     if bundles is None:
         bundles = {
-            name: fetch_external_party(
-                name, insurance_sample_size=insurance_sample_size, seed=seed
-            )
+            name: fetch_external_party(name, insurance_sample_size=insurance_sample_size, seed=seed)
             for name in ("bank", "telecom", "insurance", "retail")
         }
     bank = bundles["bank"]
