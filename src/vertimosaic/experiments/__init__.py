@@ -1,4 +1,5 @@
 from vertimosaic.experiments.benchmarks import run_cpu_benchmarks
+from vertimosaic.experiments.case_study_run import run_distributed_signal_case_study
 from vertimosaic.experiments.contribution import (
     enumerate_party_subsets,
     exact_shapley_party_utility,
@@ -53,6 +54,7 @@ __all__ = [
     "run_contribution_study",
     "run_cpu_benchmarks",
     "run_demo",
+    "run_distributed_signal_case_study",
     "run_drift_study",
     "run_dropout_study",
     "run_external_experiment",
