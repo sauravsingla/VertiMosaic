@@ -12,7 +12,9 @@ from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
 
 
-def _slice(active: ActiveParty, passive: list[PassiveParty], idx: np.ndarray) -> tuple[ActiveParty, list[PassiveParty]]:
+def _slice(
+    active: ActiveParty, passive: list[PassiveParty], idx: np.ndarray
+) -> tuple[ActiveParty, list[PassiveParty]]:
     a = ActiveParty(active.name, active._x[idx], active.labels[idx])
     p = [PassiveParty(item.name, item._x[idx]) for item in passive]
     return a, p
@@ -21,7 +23,9 @@ def _slice(active: ActiveParty, passive: list[PassiveParty], idx: np.ndarray) ->
 def run_demo(rows: int = 2000, seed: int = 42, model_name: str = "logistic") -> dict[str, float]:
     active, passive = make_vertical_synthetic(rows, seed)
     indices = np.arange(rows)
-    train_idx, test_idx = train_test_split(indices, test_size=0.30, random_state=seed, stratify=active.labels)
+    train_idx, test_idx = train_test_split(
+        indices, test_size=0.30, random_state=seed, stratify=active.labels
+    )
     train_active, train_passive = _slice(active, passive, train_idx)
     test_active, test_passive = _slice(active, passive, test_idx)
     if model_name == "logistic":

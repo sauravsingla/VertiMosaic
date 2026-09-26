@@ -19,7 +19,12 @@ def datasets_list() -> None:
 
 
 @app.command()
-def demo(rows: int = typer.Option(2000, min=200), seed: int = 42, model: str = typer.Option("logistic", help="logistic or vfl-hist-gbdt"), output: Path = Path("reports/demo_metrics.json")) -> None:
+def demo(
+    rows: int = typer.Option(2000, min=200),
+    seed: int = 42,
+    model: str = typer.Option("logistic", help="logistic or vfl-hist-gbdt"),
+    output: Path = Path("reports/demo_metrics.json"),
+) -> None:
     metrics = run_demo(rows=rows, seed=seed, model_name=model)
     write_demo_report(metrics, output)
     typer.echo(json.dumps(metrics, indent=2, sort_keys=True))
@@ -27,7 +32,10 @@ def demo(rows: int = typer.Option(2000, min=200), seed: int = 42, model: str = t
 
 @app.command("report")
 def report() -> None:
-    typer.echo("Reporting primitives are available; run an experiment to generate measured outputs.")
+    typer.echo(
+        "Reporting primitives are available; "
+        "run an experiment to generate measured outputs."
+    )
 
 
 if __name__ == "__main__":

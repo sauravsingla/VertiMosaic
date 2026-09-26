@@ -27,7 +27,7 @@ class VFLLogisticRegression:
     intercept_: float = field(default=0.0, init=False)
     loss_history_: list[float] = field(default_factory=list, init=False)
 
-    def fit(self, active: ActiveParty, passive: list[PassiveParty]) -> "VFLLogisticRegression":
+    def fit(self, active: ActiveParty, passive: list[PassiveParty]) -> VFLLogisticRegression:
         parties: list[PassiveParty] = [active, *passive]
         n = active.n_rows
         if any(p.n_rows != n for p in parties):
@@ -42,23 +42,40 @@ class VFLLogisticRegression:
             sample_weight = np.where(y == 1.0, n / (2.0 * pos), n / (2.0 * neg))
         else:
             sample_weight = np.ones(n, dtype=float)
+
         previous = np.inf
         for _ in range(self.max_iter):
             logits = np.full(n, self.intercept_, dtype=float)
             for party in parties:
                 local = party.local_logits(self.weights_[party.name])
-                logits += self.transport.send(local,message_type="local_logits",sender_role=party.name,receiver_role="active")
+                logits += self.transport.send(
+                    local,
+                    message_type="local_logits",
+                    sender_role=party.name,
+                    receiver_role="active",
+                )
             probs = _sigmoid(logits)
             eps = 1e-12
-            data_loss = -np.average(y * np.log(probs + eps) + (1.0 - y) * np.log(1.0 - probs + eps),weights=sample_weight)
-            penalty = sum(0.5 * self.l2 * float(w @ w) + self.l1 * float(np.abs(w).sum()) for w in self.weights_.values())
+            data_loss = -np.average(
+                y * np.log(probs + eps) + (1.0 - y) * np.log(1.0 - probs + eps),
+                weights=sample_weight,
+            )
+            penalty = sum(
+                0.5 * self.l2 * float(w @ w) + self.l1 * float(np.abs(w).sum())
+                for w in self.weights_.values()
+            )
             loss = float(data_loss + penalty)
             self.loss_history_.append(loss)
             if abs(previous - loss) < self.tolerance:
                 break
             previous = loss
             residual = (probs - y) * sample_weight
-            self.transport.send(residual,message_type="residual_signal",sender_role="active",receiver_role="parties")
+            self.transport.send(
+                residual,
+                message_type="residual_signal",
+                sender_role="active",
+                receiver_role="parties",
+            )
             for party in parties:
                 grad = party.local_gradient(residual)
                 grad += self.l2 * self.weights_[party.name]

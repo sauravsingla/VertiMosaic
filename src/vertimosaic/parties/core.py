@@ -36,14 +36,23 @@ class PassiveParty(Party):
         x = self._x if indices is None else self._x[indices]
         return x.T @ residual / x.shape[0]
 
-    def candidate_histograms(self, gradients: np.ndarray, hessians: np.ndarray, indices: np.ndarray, max_bins: int, min_samples_leaf: int) -> list[dict[str, float | int]]:
+    def candidate_histograms(
+        self,
+        gradients: np.ndarray,
+        hessians: np.ndarray,
+        indices: np.ndarray,
+        max_bins: int,
+        min_samples_leaf: int,
+    ) -> list[dict[str, float | int]]:
         x = self._x[indices]
         out: list[dict[str, float | int]] = []
         if len(indices) < 2 * min_samples_leaf:
             return out
         for feature_idx in range(x.shape[1]):
             values = x[:, feature_idx]
-            quantiles = np.unique(np.quantile(values, np.linspace(0.0, 1.0, max_bins + 1)[1:-1]))
+            quantiles = np.unique(
+                np.quantile(values, np.linspace(0.0, 1.0, max_bins + 1)[1:-1])
+            )
             for threshold_idx, threshold in enumerate(quantiles):
                 left = values <= threshold
                 n_left = int(left.sum())
@@ -54,10 +63,24 @@ class PassiveParty(Party):
                 h_left = float(hessians[indices][left].sum())
                 g_right = float(gradients[indices][~left].sum())
                 h_right = float(hessians[indices][~left].sum())
-                out.append({"feature": feature_idx,"threshold_index": threshold_idx,"threshold": float(threshold),"g_left": g_left,"h_left": h_left,"g_right": g_right,"h_right": h_right,"n_left": n_left,"n_right": n_right})
+                out.append(
+                    {
+                        "feature": feature_idx,
+                        "threshold_index": threshold_idx,
+                        "threshold": float(threshold),
+                        "g_left": g_left,
+                        "h_left": h_left,
+                        "g_right": g_right,
+                        "h_right": h_right,
+                        "n_left": n_left,
+                        "n_right": n_right,
+                    }
+                )
         return out
 
-    def route(self, indices: np.ndarray, feature_idx: int, threshold: float) -> tuple[np.ndarray, np.ndarray]:
+    def route(
+        self, indices: np.ndarray, feature_idx: int, threshold: float
+    ) -> tuple[np.ndarray, np.ndarray]:
         values = self._x[indices, feature_idx]
         left_mask = values <= threshold
         return indices[left_mask], indices[~left_mask]

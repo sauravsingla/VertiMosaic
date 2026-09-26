@@ -15,11 +15,51 @@ class DatasetRecord:
 
 
 REGISTRY: dict[str, DatasetRecord] = {
-    "bank": DatasetRecord("bank", "Default of Credit Card Clients", "UCI", "350", "10.24432/C55S3H", "CC BY 4.0", "ucimlrepo"),
-    "telecom": DatasetRecord("telecom", "Iranian Churn", "UCI", "563", "10.24432/C5JW3Z", "CC BY 4.0", "ucimlrepo"),
-    "insurance_freq": DatasetRecord("insurance", "freMTPL2freq", "OpenML", "41214", None, None, "sklearn.fetch_openml"),
-    "insurance_sev": DatasetRecord("insurance", "freMTPL2sev", "OpenML", "41215", None, None, "sklearn.fetch_openml"),
-    "retail": DatasetRecord("retail", "Online Retail", "UCI", "352", "10.24432/C5BW33", "CC BY 4.0", "ucimlrepo"),
+    "bank": DatasetRecord(
+        "bank",
+        "Default of Credit Card Clients",
+        "UCI",
+        "350",
+        "10.24432/C55S3H",
+        "CC BY 4.0",
+        "ucimlrepo",
+    ),
+    "telecom": DatasetRecord(
+        "telecom",
+        "Iranian Churn",
+        "UCI",
+        "563",
+        "10.24432/C5JW3Z",
+        "CC BY 4.0",
+        "ucimlrepo",
+    ),
+    "insurance_freq": DatasetRecord(
+        "insurance",
+        "freMTPL2freq",
+        "OpenML",
+        "41214",
+        None,
+        None,
+        "sklearn.fetch_openml",
+    ),
+    "insurance_sev": DatasetRecord(
+        "insurance",
+        "freMTPL2sev",
+        "OpenML",
+        "41215",
+        None,
+        None,
+        "sklearn.fetch_openml",
+    ),
+    "retail": DatasetRecord(
+        "retail",
+        "Online Retail",
+        "UCI",
+        "352",
+        "10.24432/C5BW33",
+        "CC BY 4.0",
+        "ucimlrepo",
+    ),
 }
 
 

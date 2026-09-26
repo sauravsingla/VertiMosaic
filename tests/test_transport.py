@@ -4,7 +4,8 @@ from vertimosaic.transport import InMemoryTransport
 
 
 def test_transport_metadata_for_array_scalar_list_and_object() -> None:
-    t = InMemoryTransport(); arr = np.arange(6, dtype=np.float64).reshape(2, 3)
+    t = InMemoryTransport()
+    arr = np.arange(6, dtype=np.float64).reshape(2, 3)
     assert t.send(arr, message_type="a", sender_role="p", receiver_role="q") is arr
     t.send(3.0, message_type="b", sender_role="p", receiver_role="q")
     t.send([1, 2, 3], message_type="c", sender_role="p", receiver_role="q")

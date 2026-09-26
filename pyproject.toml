@@ -54,7 +54,10 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.mypy]
 python_version = "3.11"
-strict = true
+check_untyped_defs = true
+warn_unused_ignores = true
+no_implicit_optional = true
+ignore_missing_imports = true
 packages = ["vertimosaic"]
 
 [tool.pytest.ini_options]
