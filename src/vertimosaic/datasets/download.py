@@ -51,7 +51,9 @@ def download_uci(key: str, root: Path = Path("data")) -> Path:
     target = ds.data.targets.reset_index(drop=True) if ds.data.targets is not None else None
     frame = pd.concat([features, target], axis=1) if target is not None else features
     metadata = getattr(ds, "metadata", {}) or {}
-    return _save(frame, spec, root, {"provider_metadata": metadata, "retrieval_method": "ucimlrepo"})
+    return _save(
+        frame, spec, root, {"provider_metadata": metadata, "retrieval_method": "ucimlrepo"}
+    )
 
 
 def download_openml(key: str, root: Path = Path("data")) -> Path:
@@ -62,7 +64,10 @@ def download_openml(key: str, root: Path = Path("data")) -> Path:
         frame,
         spec,
         root,
-        {"provider_metadata": {"details": bunch.details}, "retrieval_method": "sklearn.fetch_openml"},
+        {
+            "provider_metadata": {"details": bunch.details},
+            "retrieval_method": "sklearn.fetch_openml",
+        },
     )
 
 

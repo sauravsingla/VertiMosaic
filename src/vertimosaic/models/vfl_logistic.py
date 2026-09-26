@@ -36,7 +36,7 @@ class VFLLogisticRegression:
     history_: list[dict[str, float]] = field(default_factory=list, init=False)
     party_order_: tuple[str, ...] = field(default_factory=tuple, init=False)
 
-    def fit(self, parties: list[Party], active_party: ActiveParty) -> "VFLLogisticRegression":
+    def fit(self, parties: list[Party], active_party: ActiveParty) -> VFLLogisticRegression:
         if not parties:
             raise ValueError("at least one party is required")
         n = active_party.n_samples

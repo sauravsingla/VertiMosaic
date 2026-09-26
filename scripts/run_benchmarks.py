@@ -20,14 +20,16 @@ def main() -> None:
         start = time.perf_counter()
         result = run_demo(rows=rows, seed=42, model="logistic")
         elapsed = time.perf_counter() - start
-        records.append({
-            "rows": rows,
-            "model": "logistic",
-            "wall_seconds": elapsed,
-            "roc_auc": result["metrics"]["roc_auc"],
-            "pr_auc": result["metrics"]["pr_auc"],
-            "estimated_communication_bytes": result["communication"]["estimated_bytes"],
-        })
+        records.append(
+            {
+                "rows": rows,
+                "model": "logistic",
+                "wall_seconds": elapsed,
+                "roc_auc": result["metrics"]["roc_auc"],
+                "pr_auc": result["metrics"]["pr_auc"],
+                "estimated_communication_bytes": result["communication"]["estimated_bytes"],
+            }
+        )
     pd.DataFrame(records).to_csv(out / "results.csv", index=False)
     environment = {
         "python": sys.version,

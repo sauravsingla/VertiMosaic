@@ -68,7 +68,9 @@ def report() -> None:
     typer.echo("VertiMosaic measured results")
     typer.echo(f"ROC-AUC: {metrics['roc_auc']:.4f}")
     typer.echo(f"PR-AUC:  {metrics['pr_auc']:.4f}")
-    typer.echo("Interpretation is descriptive; no claim of superiority is made without a paired baseline interval.")
+    typer.echo(
+        "Interpretation is descriptive; no claim of superiority is made without a paired baseline interval."
+    )
 
 
 if __name__ == "__main__":

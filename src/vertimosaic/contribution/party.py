@@ -26,7 +26,11 @@ def exact_shapley_utility(
         others = tuple(p for p in parties if p != party)
         total = 0.0
         for subset in powerset_parties(others):
-            weight = math.factorial(len(subset)) * math.factorial(n - len(subset) - 1) / math.factorial(n)
+            weight = (
+                math.factorial(len(subset))
+                * math.factorial(n - len(subset) - 1)
+                / math.factorial(n)
+            )
             with_party = tuple(sorted((*subset, party)))
             total += weight * (utility(with_party) - utility(tuple(sorted(subset))))
         values[party] = total

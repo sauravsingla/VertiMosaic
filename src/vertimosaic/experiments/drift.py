@@ -5,7 +5,9 @@ from __future__ import annotations
 import numpy as np
 
 
-def apply_mean_shift(x: np.ndarray, amount: float, columns: tuple[int, ...] | None = None) -> np.ndarray:
+def apply_mean_shift(
+    x: np.ndarray, amount: float, columns: tuple[int, ...] | None = None
+) -> np.ndarray:
     out = np.asarray(x, dtype=float).copy()
     cols = columns if columns is not None else tuple(range(out.shape[1]))
     out[:, cols] += amount

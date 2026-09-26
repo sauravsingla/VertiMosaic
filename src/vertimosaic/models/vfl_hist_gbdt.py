@@ -34,8 +34,8 @@ class TreeNode:
     party: str | None = None
     feature: int | None = None
     bin_id: int | None = None
-    left: "TreeNode | None" = None
-    right: "TreeNode | None" = None
+    left: TreeNode | None = None
+    right: TreeNode | None = None
 
     @property
     def is_leaf(self) -> bool:
@@ -68,7 +68,7 @@ class VFLHistGBDT:
     edges_: dict[str, list[np.ndarray]] = field(default_factory=dict, init=False)
     feature_importance_: dict[str, np.ndarray] = field(default_factory=dict, init=False)
 
-    def fit(self, parties: list[Party], active_party: ActiveParty) -> "VFLHistGBDT":
+    def fit(self, parties: list[Party], active_party: ActiveParty) -> VFLHistGBDT:
         if not parties:
             raise ValueError("at least one party is required")
         n = active_party.n_samples
@@ -225,10 +225,12 @@ class VFLHistGBDT:
             if node.is_leaf:
                 out[idx] = node.value
                 return
-            assert node.party is not None and node.feature is not None and node.bin_id is not None
+            if node.party is None or node.feature is None or node.bin_id is None:
+                raise RuntimeError("non-leaf node is missing split metadata")
             owner = by_name[node.party]
             mask = owner.bins[idx, node.feature] <= node.bin_id
-            assert node.left is not None and node.right is not None
+            if node.left is None or node.right is None:
+                raise RuntimeError("non-leaf node is missing children")
             walk(node.left, idx[mask])
             walk(node.right, idx[~mask])
 

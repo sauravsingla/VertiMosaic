@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 from sklearn.metrics import (
+    average_precision_score,
     balanced_accuracy_score,
     brier_score_loss,
     f1_score,
@@ -13,7 +14,6 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     roc_auc_score,
-    average_precision_score,
 )
 
 

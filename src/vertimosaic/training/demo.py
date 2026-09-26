@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from vertimosaic.datasets import generate_synthetic
 from vertimosaic.evaluation import bootstrap_metric_ci, evaluate_binary
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
-from vertimosaic.parties import ActiveParty, PassiveParty, Party
+from vertimosaic.parties import ActiveParty, Party, PassiveParty
 from vertimosaic.preprocessing import LocalPreprocessor
 
 
@@ -40,7 +40,8 @@ def _build_parties(
         else:
             train_parties.append(PassiveParty(name, x_train, names))
             test_parties.append(PassiveParty(name, x_test, names))
-    assert active_train is not None and active_test is not None
+    if active_train is None or active_test is None:
+        raise RuntimeError("bank active party was not constructed")
     return train_parties, active_train, test_parties, active_test
 
 

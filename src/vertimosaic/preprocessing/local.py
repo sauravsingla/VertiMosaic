@@ -16,13 +16,28 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 class LocalPreprocessor:
     transformer: ColumnTransformer | None = None
 
-    def fit(self, frame: pd.DataFrame) -> "LocalPreprocessor":
+    def fit(self, frame: pd.DataFrame) -> LocalPreprocessor:
         numeric = list(frame.select_dtypes(include=np.number).columns)
         categorical = [c for c in frame.columns if c not in numeric]
         self.transformer = ColumnTransformer(
             [
-                ("num", Pipeline([("impute", SimpleImputer(strategy="median")), ("scale", StandardScaler())]), numeric),
-                ("cat", Pipeline([("impute", SimpleImputer(strategy="most_frequent")), ("encode", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]), categorical),
+                (
+                    "num",
+                    Pipeline(
+                        [("impute", SimpleImputer(strategy="median")), ("scale", StandardScaler())]
+                    ),
+                    numeric,
+                ),
+                (
+                    "cat",
+                    Pipeline(
+                        [
+                            ("impute", SimpleImputer(strategy="most_frequent")),
+                            ("encode", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+                        ]
+                    ),
+                    categorical,
+                ),
             ],
             remainder="drop",
             verbose_feature_names_out=False,

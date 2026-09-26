@@ -1,7 +1,7 @@
 import numpy as np
 
-from vertimosaic.parties import ActiveParty, PassiveParty
 from vertimosaic.models import VFLLogisticRegression
+from vertimosaic.parties import ActiveParty, PassiveParty
 
 
 def test_transport_audit_contains_no_raw_feature_matrix() -> None:

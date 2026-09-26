@@ -57,10 +57,9 @@ class CopulaLinker:
         rng = np.random.default_rng(self.seed)
         anchor_features = anchor.drop(columns=[target_column], errors="ignore")
         anchor_latent = _latent_score(anchor_features)
-        shared = (
-            np.sqrt(self.correlation) * anchor_latent
-            + np.sqrt(1.0 - self.correlation) * rng.normal(size=len(anchor))
-        )
+        shared = np.sqrt(self.correlation) * anchor_latent + np.sqrt(
+            1.0 - self.correlation
+        ) * rng.normal(size=len(anchor))
         linked: dict[str, pd.DataFrame] = {}
         reuse: dict[str, int] = {}
         for name, donor in donors.items():
