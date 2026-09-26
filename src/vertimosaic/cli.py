@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
+from typing import Annotated
 
 import pandas as pd
 import typer
@@ -257,8 +258,8 @@ def external_demo(
 
 @app.command("prepare-ieee-cis")
 def prepare_ieee_cis_command(
-    transaction: Path = typer.Option(..., exists=True, readable=True),
-    identity: Path = typer.Option(..., exists=True, readable=True),
+    transaction: Annotated[Path, typer.Option(exists=True, readable=True)],
+    identity: Annotated[Path, typer.Option(exists=True, readable=True)],
     output: Path = Path("data/processed/ieee_cis_local"),
 ) -> None:
     prepared = prepare_ieee_cis(transaction, identity)
