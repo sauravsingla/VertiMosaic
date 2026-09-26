@@ -27,6 +27,7 @@ class TreeNode:
     party: str | None = None
     feature: int | None = None
     threshold: float | None = None
+    gain: float = 0.0
     left: TreeNode | None = None
     right: TreeNode | None = None
 
@@ -176,6 +177,7 @@ class VFLHistGBDT:
         node.party = party.name
         node.feature = feature
         node.threshold = threshold
+        node.gain = float(best_gain)
         leaf_count[0] += 1
         node.left = self._build_node(
             parties, gradients, hessians, left_idx, depth + 1, rng, leaf_count
