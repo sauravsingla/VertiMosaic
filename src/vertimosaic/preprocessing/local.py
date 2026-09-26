@@ -45,7 +45,7 @@ class LocalTabularPreprocessor:
             )
         return out
 
-    def fit(self, frame: pd.DataFrame) -> "LocalTabularPreprocessor":
+    def fit(self, frame: pd.DataFrame) -> LocalTabularPreprocessor:
         self._validate()
         missing = (set(self.numeric_columns) | set(self.categorical_columns)) - set(frame.columns)
         if missing:
