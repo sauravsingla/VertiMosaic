@@ -133,36 +133,97 @@ def run_overlap_study(
     return frame
 
 
+def _dropout_metrics_record(
+    *,
+    phase: str,
+    scenario: str,
+    dropped: tuple[str, ...],
+    model: VFLLogisticRegression,
+    test_active: ActiveParty,
+    test_parties: list[PassiveParty],
+    training_seconds: float,
+) -> dict[str, Any]:
+    probability = model.predict_proba([test_active, *test_parties])[:, 1]
+    metrics = binary_metrics(test_active.labels, probability)
+    return {
+        "phase": phase,
+        "scenario": scenario,
+        "dropped_parties": "+".join(dropped),
+        "available_parties": "+".join(("bank", *[party.name for party in test_parties])),
+        "roc_auc": metrics["roc_auc"],
+        "pr_auc": metrics["pr_auc"],
+        "f1": metrics["f1"],
+        "log_loss": metrics["log_loss"],
+        "brier": metrics["brier"],
+        "ece": metrics["ece"],
+        "training_seconds": training_seconds,
+        "estimated_communication_bytes": model.transport.estimated_payload_bytes,
+    }
+
+
 def run_dropout_study(
     *,
     rows: int = 1600,
     seed: int = 42,
+    max_iter: int = 350,
     output: Path = Path("results/party_dropout.csv"),
 ) -> pd.DataFrame:
-    """Evaluate the documented inference-time missing-party scenarios."""
+    """Evaluate inference-time dropout and training-time party availability differences."""
     active, passive = make_vertical_synthetic(rows, seed)
     split = entity_level_split(active.labels, seed=seed)
     train_active, train_passive = slice_parties(active, passive, split.train)
     test_active, test_passive = slice_parties(active, passive, split.test)
-    model = VFLLogisticRegression(learning_rate=0.08, max_iter=350, l2=1e-3, seed=seed)
-    model.fit(train_active, train_passive)
+    train_map = _passive_map(train_passive)
     test_map = _passive_map(test_passive)
+
+    full_model = VFLLogisticRegression(
+        learning_rate=0.08,
+        max_iter=max_iter,
+        l2=1e-3,
+        seed=seed,
+    )
+    full_start = time.perf_counter()
+    full_model.fit(train_active, train_passive)
+    full_training_seconds = time.perf_counter() - full_start
+
     records: list[dict[str, Any]] = []
     for scenario, dropped in dropout_scenarios().items():
-        remaining = [test_map[name] for name in _PASSIVE_NAMES if name not in dropped]
-        probability = model.predict_proba([test_active, *remaining])[:, 1]
-        metrics = binary_metrics(test_active.labels, probability)
+        available_names = [name for name in _PASSIVE_NAMES if name not in dropped]
+        inference_parties = [test_map[name] for name in available_names]
         records.append(
-            {
-                "scenario": scenario,
-                "dropped_parties": "+".join(dropped),
-                "roc_auc": metrics["roc_auc"],
-                "pr_auc": metrics["pr_auc"],
-                "f1": metrics["f1"],
-                "brier": metrics["brier"],
-                "ece": metrics["ece"],
-            }
+            _dropout_metrics_record(
+                phase="inference_time_dropout",
+                scenario=scenario,
+                dropped=dropped,
+                model=full_model,
+                test_active=test_active,
+                test_parties=inference_parties,
+                training_seconds=full_training_seconds,
+            )
         )
+
+        availability_model = VFLLogisticRegression(
+            learning_rate=0.08,
+            max_iter=max_iter,
+            l2=1e-3,
+            seed=seed,
+        )
+        available_train = [train_map[name] for name in available_names]
+        training_start = time.perf_counter()
+        availability_model.fit(train_active, available_train)
+        training_seconds = time.perf_counter() - training_start
+        records.append(
+            _dropout_metrics_record(
+                phase="training_and_inference_availability",
+                scenario=scenario,
+                dropped=dropped,
+                model=availability_model,
+                test_active=test_active,
+                test_parties=inference_parties,
+                training_seconds=training_seconds,
+            )
+        )
+
     frame = pd.DataFrame(records)
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output, index=False)
