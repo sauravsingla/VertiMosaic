@@ -31,14 +31,17 @@ class VFLLogisticRegression:
     class_weight: str | dict[int, float] | None = None
     batch_size: int | None = None
     learning_rate_schedule: str = "constant"
+    early_stopping_rounds: int | None = None
     warm_start: bool = False
     seed: int = 42
     transport: InMemoryTransport = field(default_factory=InMemoryTransport)
     weights_: dict[str, np.ndarray] = field(default_factory=dict, init=False)
     intercept_: float = field(default=0.0, init=False)
     loss_history_: list[float] = field(default_factory=list, init=False)
+    validation_loss_history_: list[float] = field(default_factory=list, init=False)
     n_iter_: int = field(default=0, init=False)
     converged_: bool = field(default=False, init=False)
+    best_iteration_: int | None = field(default=None, init=False)
 
     def _validate_hyperparameters(self) -> None:
         if self.learning_rate <= 0:
@@ -55,6 +58,8 @@ class VFLLogisticRegression:
             raise ValueError(
                 "learning_rate_schedule must be constant, inverse_sqrt or linear_decay"
             )
+        if self.early_stopping_rounds is not None and self.early_stopping_rounds <= 0:
+            raise ValueError("early_stopping_rounds must be positive when supplied")
         if isinstance(self.class_weight, str) and self.class_weight != "balanced":
             raise ValueError("class_weight string must be 'balanced'")
 
@@ -91,11 +96,34 @@ class VFLLogisticRegression:
             }
             self.intercept_ = 0.0
 
+    def _penalty(self) -> float:
+        return float(
+            sum(
+                0.5 * self.l2 * float(weights @ weights) + self.l1 * float(np.abs(weights).sum())
+                for weights in self.weights_.values()
+            )
+        )
+
+    def _loss(
+        self,
+        y: np.ndarray,
+        probabilities: np.ndarray,
+        sample_weight: np.ndarray,
+    ) -> float:
+        eps = 1e-12
+        data_loss = -np.average(
+            y * np.log(probabilities + eps)
+            + (1.0 - y) * np.log(1.0 - probabilities + eps),
+            weights=sample_weight,
+        )
+        return float(data_loss + self._penalty())
+
     def _logits(
         self,
         parties: list[PassiveParty],
         indices: np.ndarray | None = None,
         *,
+        stage: str = "epoch",
         step: int | None = None,
     ) -> np.ndarray:
         n = parties[0].n_rows if indices is None else len(indices)
@@ -108,40 +136,59 @@ class VFLLogisticRegression:
                 sender_role=party.name,
                 receiver_role="active",
                 direction="forward",
-                stage="epoch",
+                stage=stage,
                 step=step,
             )
         return logits
 
-    def fit(self, active: ActiveParty, passive: list[PassiveParty]) -> VFLLogisticRegression:
+    def fit(
+        self,
+        active: ActiveParty,
+        passive: list[PassiveParty],
+        validation_active: ActiveParty | None = None,
+        validation_passive: list[PassiveParty] | None = None,
+    ) -> VFLLogisticRegression:
         self._validate_hyperparameters()
         parties: list[PassiveParty] = [active, *passive]
         n = active.n_rows
         if any(party.n_rows != n for party in parties):
             raise ValueError("all VFL parties must align to the same row count")
+        if self.early_stopping_rounds is not None and validation_active is None:
+            raise ValueError("validation data are required when early stopping is enabled")
         self._initialize(parties)
         self.loss_history_.clear()
+        self.validation_loss_history_.clear()
         self.n_iter_ = 0
         self.converged_ = False
+        self.best_iteration_ = None
         y = active.labels
         sample_weight = self._sample_weights(y)
         rng = np.random.default_rng(self.seed)
         batch_size = min(self.batch_size or n, n)
 
+        validation_parties: list[PassiveParty] | None = None
+        validation_labels: np.ndarray | None = None
+        validation_weights: np.ndarray | None = None
+        if validation_active is not None:
+            validation_passive = validation_passive or []
+            validation_parties = [validation_active, *validation_passive]
+            if {party.name for party in validation_parties} != {party.name for party in parties}:
+                raise ValueError("validation data must provide the same VFL parties as training")
+            validation_n = validation_active.n_rows
+            if any(party.n_rows != validation_n for party in validation_parties):
+                raise ValueError("validation parties must align to the same row count")
+            validation_labels = validation_active.labels
+            validation_weights = self._sample_weights(validation_labels)
+
+        best_validation_loss = np.inf
+        best_weights: dict[str, np.ndarray] | None = None
+        best_intercept = self.intercept_
+        rounds_without_improvement = 0
         previous = np.inf
         for epoch in range(self.max_iter):
-            logits = self._logits(parties, step=epoch)
+            logits = self._logits(parties, stage="epoch", step=epoch)
             probs = _sigmoid(logits)
-            eps = 1e-12
-            data_loss = -np.average(
-                y * np.log(probs + eps) + (1.0 - y) * np.log(1.0 - probs + eps),
-                weights=sample_weight,
-            )
-            penalty = sum(
-                0.5 * self.l2 * float(weights @ weights) + self.l1 * float(np.abs(weights).sum())
-                for weights in self.weights_.values()
-            )
-            loss = float(data_loss + penalty)
+            loss = self._loss(y, probs, sample_weight)
             self.loss_history_.append(loss)
             self.n_iter_ = epoch + 1
             if abs(previous - loss) < self.tolerance:
@@ -153,7 +200,7 @@ class VFLLogisticRegression:
             rate = self._epoch_learning_rate(epoch)
             for start in range(0, n, batch_size):
                 batch = order[start : start + batch_size]
-                batch_logits = self._logits(parties, batch, step=epoch)
+                batch_logits = self._logits(parties, batch, stage="epoch", step=epoch)
                 batch_probs = _sigmoid(batch_logits)
                 residual = (batch_probs - y[batch]) * sample_weight[batch]
                 self.transport.send(
@@ -178,6 +225,43 @@ class VFLLogisticRegression:
                         weights = np.sign(weights) * np.maximum(np.abs(weights) - shrink, 0.0)
                     self.weights_[party.name] = weights
                 self.intercept_ -= rate * float(residual.mean())
+
+            if (
+                validation_parties is not None
+                and validation_labels is not None
+                and validation_weights is not None
+            ):
+                validation_probability = _sigmoid(
+                    self._logits(validation_parties, stage="validation_epoch", step=epoch)
+                )
+                validation_loss = self._loss(
+                    validation_labels,
+                    validation_probability,
+                    validation_weights,
+                )
+                self.validation_loss_history_.append(validation_loss)
+                if validation_loss < best_validation_loss - 1e-12:
+                    best_validation_loss = validation_loss
+                    best_weights = {
+                        name: weights.copy() for name, weights in self.weights_.items()
+                    }
+                    best_intercept = self.intercept_
+                    self.best_iteration_ = epoch
+                    rounds_without_improvement = 0
+                else:
+                    rounds_without_improvement += 1
+                if (
+                    self.early_stopping_rounds is not None
+                    and rounds_without_improvement >= self.early_stopping_rounds
+                ):
+                    self.converged_ = True
+                    break
+
+        if self.early_stopping_rounds is not None and best_weights is not None:
+            self.weights_ = best_weights
+            self.intercept_ = best_intercept
+        elif self.best_iteration_ is None and self.n_iter_:
+            self.best_iteration_ = self.n_iter_ - 1
         return self
 
     def decision_function(self, parties: list[PassiveParty]) -> np.ndarray:
