@@ -69,7 +69,7 @@ class ExperimentConfig:
         path.write_text(yaml.safe_dump(self.to_dict(), sort_keys=True), encoding="utf-8")
 
     @classmethod
-    def from_yaml(cls, path: Path) -> "ExperimentConfig":
+    def from_yaml(cls, path: Path) -> ExperimentConfig:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         if not isinstance(data, dict):
             raise ValueError("configuration YAML must contain a mapping")
