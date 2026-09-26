@@ -38,6 +38,4 @@ def entity_level_split(
         random_state=seed + 1,
         stratify=y[holdout],
     )
-    return SplitIndices(
-        train=np.sort(train), validation=np.sort(validation), test=np.sort(test)
-    )
+    return SplitIndices(train=np.sort(train), validation=np.sort(validation), test=np.sort(test))
