@@ -8,6 +8,8 @@ import numpy as np
 
 @dataclass(frozen=True)
 class Message:
+    """Ephemeral metadata envelope for one simulated federated communication."""
+
     message_type: str
     sender_role: str
     receiver_role: str
@@ -18,6 +20,8 @@ class Message:
 
 @dataclass(frozen=True)
 class AuditEvent:
+    """Persisted communication metadata; private payload values are never retained."""
+
     message_type: str
     sender_role: str
     receiver_role: str
@@ -25,21 +29,32 @@ class AuditEvent:
     scalar_count: int
     estimated_bytes: int
 
+    @classmethod
+    def from_message(cls, message: Message) -> AuditEvent:
+        return cls(
+            message.message_type,
+            message.sender_role,
+            message.receiver_role,
+            message.shape,
+            message.scalar_count,
+            message.estimated_bytes,
+        )
+
 
 @dataclass
 class InMemoryTransport:
     """Metadata-only communication audit.
 
-    Payload values are returned to the caller but never retained by the transport or audit log.
+    Each send creates an ephemeral :class:`Message`. Payload values are returned
+    to the protocol caller but never retained by the transport or audit log.
     """
 
     audit_log: list[AuditEvent] = field(default_factory=list)
 
     def send(self, payload: Any, *, message_type: str, sender_role: str, receiver_role: str) -> Any:
         shape, count, size = self._metadata(payload)
-        self.audit_log.append(
-            AuditEvent(message_type, sender_role, receiver_role, shape, count, size)
-        )
+        message = Message(message_type, sender_role, receiver_role, shape, count, size)
+        self.audit_log.append(AuditEvent.from_message(message))
         return payload
 
     @staticmethod
@@ -47,11 +62,11 @@ class InMemoryTransport:
         if isinstance(payload, np.ndarray):
             return tuple(payload.shape), int(payload.size), int(payload.nbytes)
         if np.isscalar(payload):
-            arr = np.asarray(payload)
-            return tuple(arr.shape), 1, int(arr.nbytes)
-        if isinstance(payload, (tuple, list)) and all(np.isscalar(x) for x in payload):
-            arr = np.asarray(payload)
-            return tuple(arr.shape), int(arr.size), int(arr.nbytes)
+            array = np.asarray(payload)
+            return tuple(array.shape), 1, int(array.nbytes)
+        if isinstance(payload, (tuple, list)) and all(np.isscalar(value) for value in payload):
+            array = np.asarray(payload)
+            return tuple(array.shape), int(array.size), int(array.nbytes)
         return None, 0, 0
 
     @property
