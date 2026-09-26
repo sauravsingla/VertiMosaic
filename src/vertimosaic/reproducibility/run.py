@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import platform
-import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -32,12 +31,8 @@ _DEPENDENCIES = (
 
 
 def _git_sha() -> str | None:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, text=True
-        ).strip()
-    except (OSError, subprocess.CalledProcessError):
-        return None
+    """Return a trusted CI/user-provided Git SHA when available."""
+    return os.environ.get("GITHUB_SHA") or os.environ.get("VERTIMOSAIC_GIT_SHA")
 
 
 def environment_snapshot(seed: int | None = None) -> dict[str, Any]:
