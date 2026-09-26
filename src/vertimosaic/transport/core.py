@@ -16,6 +16,9 @@ class Message:
     shape: tuple[int, ...] | None
     scalar_count: int
     estimated_bytes: int
+    direction: str | None = None
+    stage: str | None = None
+    step: int | None = None
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,9 @@ class AuditEvent:
     shape: tuple[int, ...] | None
     scalar_count: int
     estimated_bytes: int
+    direction: str | None = None
+    stage: str | None = None
+    step: int | None = None
 
     @classmethod
     def from_message(cls, message: Message) -> AuditEvent:
@@ -38,6 +44,9 @@ class AuditEvent:
             message.shape,
             message.scalar_count,
             message.estimated_bytes,
+            message.direction,
+            message.stage,
+            message.step,
         )
 
 
@@ -51,9 +60,29 @@ class InMemoryTransport:
 
     audit_log: list[AuditEvent] = field(default_factory=list)
 
-    def send(self, payload: Any, *, message_type: str, sender_role: str, receiver_role: str) -> Any:
+    def send(
+        self,
+        payload: Any,
+        *,
+        message_type: str,
+        sender_role: str,
+        receiver_role: str,
+        direction: str | None = None,
+        stage: str | None = None,
+        step: int | None = None,
+    ) -> Any:
         shape, count, size = self._metadata(payload)
-        message = Message(message_type, sender_role, receiver_role, shape, count, size)
+        message = Message(
+            message_type,
+            sender_role,
+            receiver_role,
+            shape,
+            count,
+            size,
+            direction,
+            stage,
+            step,
+        )
         self.audit_log.append(AuditEvent.from_message(message))
         return payload
 
