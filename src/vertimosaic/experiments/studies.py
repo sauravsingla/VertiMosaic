@@ -180,6 +180,24 @@ def _categorical_shifted_matrix(values: np.ndarray, *, seed: int) -> np.ndarray:
     return out
 
 
+def _apply_drift_scenario(
+    values: np.ndarray,
+    scenario: dict[str, Any],
+    *,
+    seed: int,
+) -> np.ndarray:
+    if bool(scenario.get("categorical_frequency_shift", False)):
+        return _categorical_shifted_matrix(values, seed=seed)
+    shifted = apply_numeric_drift(
+        values,
+        mean_shift=float(scenario.get("mean_shift", 0.0)),
+        variance_scale=float(scenario.get("variance_scale", 1.0)),
+        missingness_increase=float(scenario.get("missingness_increase", 0.0)),
+        seed=seed,
+    )
+    return np.nan_to_num(shifted, nan=0.0)
+
+
 def run_drift_study(
     *,
     rows: int = 1600,
@@ -227,24 +245,17 @@ def run_drift_study(
             test_active.labels.copy(),
         )
         passive_eval = [PassiveParty(item.name, item._x.copy()) for item in test_passive]
-
-        def drift(values: np.ndarray) -> np.ndarray:
-            if bool(scenario.get("categorical_frequency_shift", False)):
-                return _categorical_shifted_matrix(values, seed=seed)
-            shifted = apply_numeric_drift(
-                values,
-                mean_shift=float(scenario.get("mean_shift", 0.0)),
-                variance_scale=float(scenario.get("variance_scale", 1.0)),
-                missingness_increase=float(scenario.get("missingness_increase", 0.0)),
-                seed=seed,
-            )
-            return np.nan_to_num(shifted, nan=0.0)
-
         if party_name == "bank":
-            active_eval = ActiveParty("bank", drift(active_eval._x), active_eval.labels)
+            shifted = _apply_drift_scenario(active_eval._x, scenario, seed=seed)
+            active_eval = ActiveParty("bank", shifted, active_eval.labels)
         elif isinstance(party_name, str):
             passive_eval = [
-                PassiveParty(item.name, drift(item._x) if item.name == party_name else item._x)
+                PassiveParty(
+                    item.name,
+                    _apply_drift_scenario(item._x, scenario, seed=seed)
+                    if item.name == party_name
+                    else item._x,
+                )
                 for item in passive_eval
             ]
         probability = model.predict_proba([active_eval, *passive_eval])[:, 1]
