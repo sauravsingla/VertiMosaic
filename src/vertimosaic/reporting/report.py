@@ -33,7 +33,10 @@ def build_data_driven_report(payload: dict[str, Any]) -> dict[str, Any]:
         ],
         "limitations": [
             "Raw-feature locality does not imply cryptographic confidentiality.",
-            "The four-industry external benchmark uses explicitly semi-synthetic cross-domain linkage.",
+            (
+                "The four-industry external benchmark uses explicitly semi-synthetic "
+                "cross-domain linkage."
+            ),
             "Simulated payload bytes are not real network-traffic measurements.",
         ],
         "source": payload,
