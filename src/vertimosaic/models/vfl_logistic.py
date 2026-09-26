@@ -91,7 +91,13 @@ class VFLLogisticRegression:
             }
             self.intercept_ = 0.0
 
-    def _logits(self, parties: list[PassiveParty], indices: np.ndarray | None = None) -> np.ndarray:
+    def _logits(
+        self,
+        parties: list[PassiveParty],
+        indices: np.ndarray | None = None,
+        *,
+        step: int | None = None,
+    ) -> np.ndarray:
         n = parties[0].n_rows if indices is None else len(indices)
         logits = np.full(n, self.intercept_, dtype=float)
         for party in parties:
@@ -101,6 +107,9 @@ class VFLLogisticRegression:
                 message_type="local_logits",
                 sender_role=party.name,
                 receiver_role="active",
+                direction="forward",
+                stage="epoch",
+                step=step,
             )
         return logits
 
@@ -121,7 +130,7 @@ class VFLLogisticRegression:
 
         previous = np.inf
         for epoch in range(self.max_iter):
-            logits = self._logits(parties)
+            logits = self._logits(parties, step=epoch)
             probs = _sigmoid(logits)
             eps = 1e-12
             data_loss = -np.average(
@@ -144,7 +153,7 @@ class VFLLogisticRegression:
             rate = self._epoch_learning_rate(epoch)
             for start in range(0, n, batch_size):
                 batch = order[start : start + batch_size]
-                batch_logits = self._logits(parties, batch)
+                batch_logits = self._logits(parties, batch, step=epoch)
                 batch_probs = _sigmoid(batch_logits)
                 residual = (batch_probs - y[batch]) * sample_weight[batch]
                 self.transport.send(
@@ -152,6 +161,9 @@ class VFLLogisticRegression:
                     message_type="residual_signal",
                     sender_role="active",
                     receiver_role="parties",
+                    direction="backward",
+                    stage="epoch",
+                    step=epoch,
                 )
                 for party in parties:
                     grad = party.local_gradient(residual, batch)
