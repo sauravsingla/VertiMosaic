@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use VertiMosaic, please cite the software."
+title: "VertiMosaic: CPU-Only Cross-Industry Vertical Federated Learning for Privacy-Constrained Tabular Machine Learning"
+type: software
+version: 0.1.0
+license: Apache-2.0
+repository-code: "https://github.com/sauravsingla/VertiMosaic"
+authors:
+  - family-names: Singla
+    given-names: Saurav
