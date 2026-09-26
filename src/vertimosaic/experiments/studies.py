@@ -7,25 +7,31 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score
 
 from vertimosaic.datasets import make_vertical_synthetic
 from vertimosaic.evaluation import binary_metrics, entity_level_split
-from vertimosaic.experiments.contribution import exact_shapley_party_utility
 from vertimosaic.experiments.pipeline import slice_parties
-from vertimosaic.experiments.robustness import apply_numeric_drift, dropout_scenarios
+from vertimosaic.experiments.robustness import (
+    apply_categorical_frequency_drift,
+    apply_numeric_drift,
+    dropout_scenarios,
+)
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
 
 _PASSIVE_NAMES = ("telecom", "insurance", "retail")
-_ALL_NAMES = ("bank", *_PASSIVE_NAMES)
 
 
-def _model(name: str) -> VFLLogisticRegression | VFLHistGBDT:
+def _model(name: str, seed: int) -> VFLLogisticRegression | VFLHistGBDT:
     if name == "logistic":
-        return VFLLogisticRegression(learning_rate=0.08, max_iter=350, l2=1e-3)
+        return VFLLogisticRegression(learning_rate=0.08, max_iter=350, l2=1e-3, seed=seed)
     if name == "vfl-hist-gbdt":
-        return VFLHistGBDT(n_estimators=12, max_depth=2, min_samples_leaf=15)
+        return VFLHistGBDT(
+            n_estimators=12,
+            max_depth=2,
+            min_samples_leaf=15,
+            seed=seed,
+        )
     raise ValueError(f"unknown model: {name}")
 
 
@@ -40,6 +46,7 @@ def run_ablation_study(
     model_name: str = "logistic",
     output: Path = Path("results/party_ablation.csv"),
 ) -> pd.DataFrame:
+    """Run all scientifically valid Bank-plus-passive party subsets under VFL training."""
     active, passive = make_vertical_synthetic(rows, seed)
     split = entity_level_split(active.labels, seed=seed)
     train_active, train_passive = slice_parties(active, passive, split.train)
@@ -47,9 +54,9 @@ def run_ablation_study(
     train_map = _passive_map(train_passive)
     test_map = _passive_map(test_passive)
     records: list[dict[str, Any]] = []
-    for r in range(len(_PASSIVE_NAMES) + 1):
-        for subset in combinations(_PASSIVE_NAMES, r):
-            model = _model(model_name)
+    for subset_size in range(len(_PASSIVE_NAMES) + 1):
+        for subset in combinations(_PASSIVE_NAMES, subset_size):
+            model = _model(model_name, seed)
             selected_train = [train_map[name] for name in subset]
             selected_test = [test_map[name] for name in subset]
             start = time.perf_counter()
@@ -85,6 +92,7 @@ def run_overlap_study(
     fractions: tuple[float, ...] = (1.0, 0.9, 0.75, 0.5, 0.25),
     output: Path = Path("results/partial_overlap.csv"),
 ) -> pd.DataFrame:
+    """Evaluate explicit intersection-only performance over controlled entity overlap."""
     active, passive = make_vertical_synthetic(rows, seed)
     rng = np.random.default_rng(seed)
     order = rng.permutation(rows)
@@ -99,7 +107,7 @@ def run_overlap_study(
         split = entity_level_split(subset_active.labels, seed=seed)
         train_active, train_passive = slice_parties(subset_active, subset_passive, split.train)
         test_active, test_passive = slice_parties(subset_active, subset_passive, split.test)
-        model = _model(model_name)
+        model = _model(model_name, seed)
         start = time.perf_counter()
         model.fit(train_active, train_passive)
         training_seconds = time.perf_counter() - start
@@ -131,11 +139,12 @@ def run_dropout_study(
     seed: int = 42,
     output: Path = Path("results/party_dropout.csv"),
 ) -> pd.DataFrame:
+    """Evaluate the documented inference-time missing-party scenarios."""
     active, passive = make_vertical_synthetic(rows, seed)
     split = entity_level_split(active.labels, seed=seed)
     train_active, train_passive = slice_parties(active, passive, split.train)
     test_active, test_passive = slice_parties(active, passive, split.test)
-    model = VFLLogisticRegression(learning_rate=0.08, max_iter=350, l2=1e-3)
+    model = VFLLogisticRegression(learning_rate=0.08, max_iter=350, l2=1e-3, seed=seed)
     model.fit(train_active, train_passive)
     test_map = _passive_map(test_passive)
     records: list[dict[str, Any]] = []
@@ -160,138 +169,101 @@ def run_dropout_study(
     return frame
 
 
+def _categorical_shifted_matrix(values: np.ndarray, *, seed: int) -> np.ndarray:
+    """Discretize one synthetic feature, shift its frequencies, and retain numeric codes."""
+    out = values.copy()
+    feature = out[:, 0]
+    quantiles = np.quantile(feature, [1.0 / 3.0, 2.0 / 3.0])
+    categories = np.digitize(feature, quantiles).astype(object)
+    shifted = apply_categorical_frequency_drift(categories, strength=0.55, seed=seed)
+    out[:, 0] = np.asarray(shifted, dtype=float)
+    return out
+
+
 def run_drift_study(
     *,
     rows: int = 1600,
     seed: int = 42,
     output: Path = Path("results/feature_drift.csv"),
 ) -> pd.DataFrame:
+    """Evaluate mean, variance, missingness, and categorical-frequency shifts."""
     active, passive = make_vertical_synthetic(rows, seed)
     split = entity_level_split(active.labels, seed=seed)
     train_active, train_passive = slice_parties(active, passive, split.train)
     test_active, test_passive = slice_parties(active, passive, split.test)
-    model = VFLLogisticRegression(learning_rate=0.08, max_iter=350, l2=1e-3)
+    model = VFLLogisticRegression(learning_rate=0.08, max_iter=350, l2=1e-3, seed=seed)
     model.fit(train_active, train_passive)
-    scenarios: list[tuple[str, str | None, float, float]] = [
-        ("baseline", None, 0.0, 1.0),
-        ("telecom_mean_shift", "telecom", 0.75, 1.0),
-        ("insurance_variance_shift", "insurance", 0.0, 1.5),
-        ("retail_mean_variance_shift", "retail", 0.5, 1.3),
-        ("bank_repayment_proxy_shift", "bank", 0.5, 1.2),
+    scenarios: list[dict[str, Any]] = [
+        {"scenario": "baseline", "party": None},
+        {"scenario": "telecom_mean_shift", "party": "telecom", "mean_shift": 0.75},
+        {
+            "scenario": "insurance_variance_shift",
+            "party": "insurance",
+            "variance_scale": 1.5,
+        },
+        {
+            "scenario": "retail_missingness_shift",
+            "party": "retail",
+            "missingness_increase": 0.20,
+        },
+        {
+            "scenario": "retail_categorical_frequency_shift",
+            "party": "retail",
+            "categorical_frequency_shift": True,
+        },
+        {
+            "scenario": "bank_repayment_proxy_shift",
+            "party": "bank",
+            "mean_shift": 0.5,
+            "variance_scale": 1.2,
+        },
     ]
     records: list[dict[str, Any]] = []
-    for name, party_name, mean_shift, variance_scale in scenarios:
+    for scenario in scenarios:
+        party_name = scenario.get("party")
         active_eval = ActiveParty(
-            test_active.name, test_active._x.copy(), test_active.labels.copy()
+            test_active.name,
+            test_active._x.copy(),
+            test_active.labels.copy(),
         )
         passive_eval = [PassiveParty(item.name, item._x.copy()) for item in test_passive]
-        if party_name == "bank":
-            active_eval = ActiveParty(
-                "bank",
-                apply_numeric_drift(
-                    active_eval._x,
-                    mean_shift=mean_shift,
-                    variance_scale=variance_scale,
-                    seed=seed,
-                ),
-                active_eval.labels,
+
+        def drift(values: np.ndarray) -> np.ndarray:
+            if bool(scenario.get("categorical_frequency_shift", False)):
+                return _categorical_shifted_matrix(values, seed=seed)
+            shifted = apply_numeric_drift(
+                values,
+                mean_shift=float(scenario.get("mean_shift", 0.0)),
+                variance_scale=float(scenario.get("variance_scale", 1.0)),
+                missingness_increase=float(scenario.get("missingness_increase", 0.0)),
+                seed=seed,
             )
-        elif party_name is not None:
+            return np.nan_to_num(shifted, nan=0.0)
+
+        if party_name == "bank":
+            active_eval = ActiveParty("bank", drift(active_eval._x), active_eval.labels)
+        elif isinstance(party_name, str):
             passive_eval = [
-                PassiveParty(
-                    item.name,
-                    apply_numeric_drift(
-                        item._x,
-                        mean_shift=mean_shift,
-                        variance_scale=variance_scale,
-                        seed=seed,
-                    )
-                    if item.name == party_name
-                    else item._x,
-                )
+                PassiveParty(item.name, drift(item._x) if item.name == party_name else item._x)
                 for item in passive_eval
             ]
         probability = model.predict_proba([active_eval, *passive_eval])[:, 1]
         metrics = binary_metrics(active_eval.labels, probability)
         records.append(
             {
-                "scenario": name,
+                "scenario": scenario["scenario"],
                 "party": party_name or "none",
-                "mean_shift": mean_shift,
-                "variance_scale": variance_scale,
+                "mean_shift": float(scenario.get("mean_shift", 0.0)),
+                "variance_scale": float(scenario.get("variance_scale", 1.0)),
+                "missingness_increase": float(scenario.get("missingness_increase", 0.0)),
+                "categorical_frequency_shift": bool(
+                    scenario.get("categorical_frequency_shift", False)
+                ),
                 "roc_auc": metrics["roc_auc"],
                 "pr_auc": metrics["pr_auc"],
                 "f1": metrics["f1"],
                 "brier": metrics["brier"],
                 "ece": metrics["ece"],
-            }
-        )
-    frame = pd.DataFrame(records)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_csv(output, index=False)
-    return frame
-
-
-def run_contribution_study(
-    *,
-    rows: int = 800,
-    seed: int = 42,
-    output: Path = Path("results/party_contribution.csv"),
-) -> pd.DataFrame:
-    active, passive = make_vertical_synthetic(rows, seed)
-    split = entity_level_split(active.labels, seed=seed)
-    train_active, train_passive = slice_parties(active, passive, split.train)
-    test_active, test_passive = slice_parties(active, passive, split.test)
-    train_map = _passive_map(train_passive)
-    test_map = _passive_map(test_passive)
-    cache: dict[tuple[str, ...], float] = {}
-
-    def score(subset: tuple[str, ...]) -> float:
-        key = tuple(sorted(subset))
-        if key in cache:
-            return cache[key]
-        bank_included = "bank" in key
-        train_x = train_active._x if bank_included else np.zeros((train_active.n_rows, 0))
-        test_x = test_active._x if bank_included else np.zeros((test_active.n_rows, 0))
-        local_train_active = ActiveParty("bank", train_x, train_active.labels)
-        local_test_active = ActiveParty("bank", test_x, test_active.labels)
-        selected = [name for name in _PASSIVE_NAMES if name in key]
-        model = VFLLogisticRegression(learning_rate=0.08, max_iter=300, l2=1e-3)
-        model.fit(local_train_active, [train_map[name] for name in selected])
-        selected_test = [test_map[name] for name in selected]
-        probability = model.predict_proba([local_test_active, *selected_test])[:, 1]
-        value = float(roc_auc_score(local_test_active.labels, probability))
-        cache[key] = value
-        return value
-
-    full = score(_ALL_NAMES)
-    shapley = exact_shapley_party_utility(_ALL_NAMES, score)
-    records: list[dict[str, Any]] = []
-    for party in _ALL_NAMES:
-        without = tuple(name for name in _ALL_NAMES if name != party)
-        ablated = score(without)
-        records.append(
-            {
-                "model": "logistic",
-                "party": party,
-                "method": "leave_one_party_out",
-                "metric": "roc_auc",
-                "full_score": full,
-                "ablated_score": ablated,
-                "delta": full - ablated,
-                "run_id": f"synthetic-{seed}",
-            }
-        )
-        records.append(
-            {
-                "model": "logistic",
-                "party": party,
-                "method": "exact_shapley_predictive_utility",
-                "metric": "roc_auc",
-                "full_score": full,
-                "ablated_score": np.nan,
-                "delta": shapley[party],
-                "run_id": f"synthetic-{seed}",
             }
         )
     frame = pd.DataFrame(records)
