@@ -5,7 +5,7 @@ import os
 import platform
 import subprocess
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
 from importlib import metadata
 from pathlib import Path
@@ -81,9 +81,9 @@ class RunArtifacts:
         return self.root / self.run_id
 
     @classmethod
-    def create(cls, root: Path = Path("runs"), run_id: str | None = None) -> "RunArtifacts":
+    def create(cls, root: Path = Path("runs"), run_id: str | None = None) -> RunArtifacts:
         if run_id is None:
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
             run_id = f"run-{timestamp}-{os.getpid()}"
         obj = cls(root=root, run_id=run_id)
         obj.directory.mkdir(parents=True, exist_ok=False)
@@ -131,7 +131,7 @@ class RunArtifacts:
         config_bytes = yaml.safe_dump(config, sort_keys=True).encode("utf-8")
         manifest = {
             "run_id": self.run_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
             "seed": seed,
             "git_sha": _git_sha(),
             "configuration_hash": sha256(config_bytes).hexdigest(),
