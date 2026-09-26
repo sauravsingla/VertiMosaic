@@ -125,9 +125,7 @@ def run_contribution_study(
                 )
                 for item in permuted_passive
             ]
-        permuted_probability = full_model.predict_proba(
-            [permuted_active, *permuted_passive]
-        )[:, 1]
+        permuted_probability = full_model.predict_proba([permuted_active, *permuted_passive])[:, 1]
         permuted_score = float(roc_auc_score(test_active.labels, permuted_probability))
         records.append(
             {
