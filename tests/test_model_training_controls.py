@@ -2,6 +2,7 @@ import numpy as np
 
 from vertimosaic.datasets import make_vertical_synthetic
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
+from vertimosaic.models.vfl_hist_gbdt import TreeNode
 from vertimosaic.parties import ActiveParty, PassiveParty
 
 
@@ -14,12 +15,12 @@ def _slice(
     )
 
 
-def _leaf_count(node: object) -> int:
-    left = getattr(node, "left")
-    right = getattr(node, "right")
-    if left is None and right is None:
+def _leaf_count(node: TreeNode) -> int:
+    if node.left is None and node.right is None:
         return 1
-    return _leaf_count(left) + _leaf_count(right)
+    if node.left is None or node.right is None:
+        raise AssertionError("non-leaf test node must have both children")
+    return _leaf_count(node.left) + _leaf_count(node.right)
 
 
 def test_logistic_supports_minibatches_schedule_elastic_net_and_warm_start() -> None:
