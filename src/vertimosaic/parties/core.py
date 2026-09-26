@@ -43,12 +43,19 @@ class PassiveParty(Party):
         indices: np.ndarray,
         max_bins: int,
         min_samples_leaf: int,
+        feature_indices: np.ndarray | None = None,
     ) -> list[dict[str, float | int]]:
         x = self._x[indices]
         out: list[dict[str, float | int]] = []
         if len(indices) < 2 * min_samples_leaf:
             return out
-        for feature_idx in range(x.shape[1]):
+        if feature_indices is None:
+            features = np.arange(x.shape[1], dtype=int)
+        else:
+            features = np.asarray(feature_indices, dtype=int).reshape(-1)
+            if np.any(features < 0) or np.any(features >= x.shape[1]):
+                raise ValueError("feature_indices contain an out-of-range feature")
+        for feature_idx in features:
             values = x[:, feature_idx]
             quantiles = np.unique(np.quantile(values, np.linspace(0.0, 1.0, max_bins + 1)[1:-1]))
             for threshold_idx, threshold in enumerate(quantiles):
@@ -63,7 +70,7 @@ class PassiveParty(Party):
                 h_right = float(hessians[indices][~left].sum())
                 out.append(
                     {
-                        "feature": feature_idx,
+                        "feature": int(feature_idx),
                         "threshold_index": threshold_idx,
                         "threshold": float(threshold),
                         "g_left": g_left,
