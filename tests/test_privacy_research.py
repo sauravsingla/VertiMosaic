@@ -1,14 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
-from __future__ import annotations
-
 import numpy as np
 
 from vertimosaic.datasets.synthetic import make_vertical_synthetic
 from vertimosaic.models import VFLLogisticRegression
-from vertimosaic.privacy import (
-    privacy_research_summary_rows,
-    run_privacy_research,
-)
+from vertimosaic.privacy import privacy_research_summary_rows, run_privacy_research
 
 
 _REQUIRED_EXPERIMENTS = {
