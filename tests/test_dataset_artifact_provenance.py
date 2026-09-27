@@ -77,7 +77,7 @@ def test_runtime_insurance_licenses_and_checksums_are_retained_per_source(tmp_pa
                 "insurance_sev": "c" * 64,
             },
             "source_checksum_algorithm": "sha256",
-            "source_checksum_scope": "retrieved_dataframe_content_before_sampling_or_transformation",
+            "source_checksum_scope": "retrieved_frame_before_sampling_or_transformation",
         },
     )
 
