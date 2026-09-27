@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -136,6 +137,8 @@ class RemotePartyService:
                 raise ValueError("gradient/Hessian signals must match the remote partition rows")
             if not np.isfinite(gradients).all() or not np.isfinite(hessians).all():
                 raise ValueError("gradient/Hessian signals must be finite")
+            for key in [key for key in self._signal_cache if key[0] == partition]:
+                self._signal_cache.pop(key, None)
             self._signal_cache[(partition, signal_ref)] = (
                 gradients.copy(),
                 hessians.copy(),
@@ -380,6 +383,16 @@ class RemotePassiveParty:
         if ref == self._active_signal_ref:
             self._active_signal_ref = None
 
+    @staticmethod
+    def _signal_reference(gradients: np.ndarray, hessians: np.ndarray) -> str:
+        digest = hashlib.sha256()
+        gradient_values = np.ascontiguousarray(gradients, dtype=float)
+        hessian_values = np.ascontiguousarray(hessians, dtype=float)
+        digest.update(gradient_values.shape[0].to_bytes(8, "big", signed=False))
+        digest.update(gradient_values.tobytes())
+        digest.update(hessian_values.tobytes())
+        return f"round-{digest.hexdigest()[:24]}"
+
     def candidate_histograms(
         self,
         gradients: np.ndarray,
@@ -389,20 +402,24 @@ class RemotePassiveParty:
         min_samples_leaf: int,
         feature_indices: np.ndarray | None = None,
     ) -> list[HistogramCandidate]:
-        request: dict[str, Any] = {
-            "indices": np.asarray(indices, dtype=int),
-            "max_bins": int(max_bins),
-            "min_samples_leaf": int(min_samples_leaf),
-            "feature_indices": feature_indices,
-        }
-        if self._active_signal_ref is None:
-            request["gradients"] = np.asarray(gradients, dtype=float)
-            request["hessians"] = np.asarray(hessians, dtype=float)
-        else:
-            request["signal_ref"] = self._active_signal_ref
+        gradient_values = np.asarray(gradients, dtype=float).reshape(-1)
+        hessian_values = np.asarray(hessians, dtype=float).reshape(-1)
+        signal_ref = self._signal_reference(gradient_values, hessian_values)
+        if self._active_signal_ref != signal_ref:
+            self.set_gradient_hessian(
+                gradient_values,
+                hessian_values,
+                signal_ref=signal_ref,
+            )
         delivered = self._rpc(
             _HIST_CANDIDATES,
-            request,
+            {
+                "signal_ref": signal_ref,
+                "indices": np.asarray(indices, dtype=int),
+                "max_bins": int(max_bins),
+                "min_samples_leaf": int(min_samples_leaf),
+                "feature_indices": feature_indices,
+            },
             stage="histogram_candidates",
         )
         if not isinstance(delivered, list):
