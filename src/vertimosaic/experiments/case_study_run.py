@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import SupportsFloat, SupportsIndex, cast
 
 import numpy as np
 
@@ -11,6 +12,11 @@ from vertimosaic.experiments.pipeline import slice_parties
 from vertimosaic.models import VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
 from vertimosaic.reporting import select_sanitized_case_study
+
+
+def _numeric(value: object) -> float:
+    """Narrow measured scalar values from the generic case-study payload."""
+    return float(cast(str | SupportsFloat | SupportsIndex, value))
 
 
 def run_distributed_signal_case_study(
@@ -95,15 +101,15 @@ def run_distributed_signal_case_study(
         "# Sanitized model-generated case study",
         "",
         f"Entity: `{result['entity_id']}`",
-        f"Bank-only risk: {float(result['bank_only_risk']):.6f}",
-        f"Four-party VFL risk: {float(result['four_party_vfl_risk']):.6f}",
-        f"Validation-selected threshold: {float(result['threshold']):.6f}",
+        f"Bank-only risk: {_numeric(result['bank_only_risk']):.6f}",
+        f"Four-party VFL risk: {_numeric(result['four_party_vfl_risk']):.6f}",
+        f"Validation-selected threshold: {_numeric(result['threshold']):.6f}",
         "",
         "## Predictive contribution summary",
         "",
     ]
     for party, value in contributions.items():
-        lines.append(f"- {party}: {float(value):.6f}")
+        lines.append(f"- {party}: {_numeric(value):.6f}")
     lines.extend(
         [
             "",
