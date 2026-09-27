@@ -129,7 +129,9 @@ def _complete_source_metadata(
             record["retrieval_date"] = metadata.get("retrieval_date")
             record["processed_rows"] = len(bundle.features)
             checksum = source_checksums.get(key)
-            record["checksum"] = checksum if isinstance(checksum, str) and checksum.strip() else None
+            record["checksum"] = (
+                checksum if isinstance(checksum, str) and checksum.strip() else None
+            )
             record["checksum_algorithm"] = metadata.get("source_checksum_algorithm")
             record["checksum_scope"] = metadata.get("source_checksum_scope")
             if key in source_raw_rows:
