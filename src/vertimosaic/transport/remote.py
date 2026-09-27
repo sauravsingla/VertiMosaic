@@ -194,7 +194,9 @@ class RemoteHTTPTransport(InMemoryTransport):
                     ) from exc
                 time.sleep(self.backoff_seconds * (2**attempt))
         else:
-            raise RuntimeError("remote transport retry loop terminated unexpectedly") from last_error
+            raise RuntimeError(
+                "remote transport retry loop terminated unexpectedly"
+            ) from last_error
 
         message = Message(
             message_type=message_type,
