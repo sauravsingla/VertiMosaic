@@ -127,17 +127,21 @@ class VFLLogisticRegression:
     ) -> np.ndarray:
         n = parties[0].n_rows if indices is None else len(indices)
         logits = np.full(n, self.intercept_, dtype=float)
+        active_name = parties[0].name
         for party in parties:
             local = party.local_logits(self.weights_[party.name], indices)
-            logits += self.transport.send(
-                local,
-                message_type="local_logits",
-                sender_role=party.name,
-                receiver_role="active",
-                direction="forward",
-                stage=stage,
-                step=step,
-            )
+            if party.name == active_name:
+                logits += local
+            else:
+                logits += self.transport.send(
+                    local,
+                    message_type="local_logits",
+                    sender_role=party.name,
+                    receiver_role=active_name,
+                    direction="forward",
+                    stage=stage,
+                    step=step,
+                )
         return logits
 
     def fit(
@@ -202,15 +206,16 @@ class VFLLogisticRegression:
                 batch_logits = self._logits(parties, batch, stage="epoch", step=epoch)
                 batch_probs = _sigmoid(batch_logits)
                 residual = (batch_probs - y[batch]) * sample_weight[batch]
-                self.transport.send(
-                    residual,
-                    message_type="residual_signal",
-                    sender_role="active",
-                    receiver_role="parties",
-                    direction="backward",
-                    stage="epoch",
-                    step=epoch,
-                )
+                for party in passive:
+                    self.transport.send(
+                        residual,
+                        message_type="residual_signal",
+                        sender_role=active.name,
+                        receiver_role=party.name,
+                        direction="backward",
+                        stage="epoch",
+                        step=epoch,
+                    )
                 for party in parties:
                     grad = party.local_gradient(residual, batch)
                     grad += self.l2 * self.weights_[party.name]
