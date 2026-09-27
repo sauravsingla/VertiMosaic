@@ -1,3 +1,3 @@
-from vertimosaic.transport.core import AuditEvent, InMemoryTransport, Message
+from vertimosaic.transport.core import AuditEvent, InMemoryTransport, Message, StructuredPayload
 
-__all__ = ["AuditEvent", "InMemoryTransport", "Message"]
+__all__ = ["AuditEvent", "InMemoryTransport", "Message", "StructuredPayload"]
