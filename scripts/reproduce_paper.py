@@ -25,7 +25,7 @@ from vertimosaic.reporting import write_final_report
 def main(*, smoke: bool = False) -> None:
     bootstrap_replicates = 100 if smoke else 1000
     experiment_rows = 2000 if smoke else 5000
-    benchmark_sizes = [1000, 3000] if smoke else [10_000, 30_000, 50_000, 100_000]
+    benchmark_sizes = [1000, 3000] if smoke else [10_000, 30_000, 50_000, 100_000, 250_000]
 
     logistic = run_synthetic_experiment(
         rows=experiment_rows,
