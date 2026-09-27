@@ -16,6 +16,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
       - run: pip install -e ".[dev]"
+      - name: Show Ruff import fix
+        run: ruff check --fix --diff tests/test_privacy_research.py || true
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy src/vertimosaic
