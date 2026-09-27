@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from vertimosaic.evaluation import SplitIndices
@@ -37,7 +38,7 @@ def prepare_external_splits_locally(
     artifact_directory: Path = Path("artifacts"),
 ) -> ExternalPreparedSplits:
     """Fit one preprocessor per party on TRAIN only and transform all entity splits."""
-    transformed: dict[str, tuple[object, object, object]] = {}
+    transformed: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
     paths: dict[str, str] = {}
     start = time.perf_counter()
 
