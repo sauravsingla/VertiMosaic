@@ -40,9 +40,11 @@ class TreeNode:
 class VFLHistGBDT:
     """CPU vertical histogram gradient boosting research implementation.
 
-    Passive parties expose only aggregate split statistics plus opaque feature/bin
-    references to the active-party protocol. This provides data locality and feature
-    separation, not cryptographic confidentiality.
+    Passive parties compute histogram candidates locally and expose aggregate
+    gradient/Hessian/count statistics plus the derived split metadata required by
+    this in-process simulator. Raw passive feature matrices and feature names remain
+    party-local, but numeric split thresholds and routing metadata are not
+    cryptographically hidden. See the threat-model documentation for this boundary.
     """
 
     n_estimators: int = 20
