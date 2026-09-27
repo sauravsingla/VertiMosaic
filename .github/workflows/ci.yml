@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 name: CI
 on:
   push:
@@ -18,10 +19,28 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy src/vertimosaic
-      - run: pytest -q --cov=vertimosaic --cov-report=term-missing
+      - name: Full test suite with coverage report
+        run: pytest -q --cov=vertimosaic --cov-report=term-missing --cov-report=xml:coverage.xml
+      - name: Protocol-critical coverage gate (>=90%)
+        run: make coverage-protocol
       - run: vertimosaic demo --rows 2000 --seed 42
       - name: Complete CPU paper smoke pipeline
         if: matrix.python-version == '3.12'
         run: python scripts/reproduce_paper.py --smoke
+      - name: Retain measured smoke and publication evidence
+        if: matrix.python-version == '3.12' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vertimosaic-smoke-evidence-py312
+          path: |
+            results/
+            reports/
+            benchmarks/
+            paper/figures/
+            paper/tables/
+            runs/
+            coverage.xml
+          if-no-files-found: error
+          retention-days: 30
       - run: python -m build
       - run: twine check dist/*
