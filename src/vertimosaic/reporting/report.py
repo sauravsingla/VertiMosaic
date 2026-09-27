@@ -17,17 +17,29 @@ def _read_csv(path: Path) -> pd.DataFrame | None:
     return pd.read_csv(path) if path.exists() else None
 
 
-def _overlap_observation(frame: pd.DataFrame) -> str:
-    ordered = frame.sort_values("overlap_fraction")
-    low = ordered.iloc[0]
-    high = ordered.iloc[-1]
-    delta = float(low["pr_auc"]) - float(high["pr_auc"])
-    return (
-        f"Partial-overlap study: PR-AUC changed by {delta:.6f} between "
-        f"overlap={float(high['overlap_fraction']):.2f} and "
-        f"overlap={float(low['overlap_fraction']):.2f}; coverage at the latter was "
-        f"{float(low['coverage']):.6f}."
-    )
+def _overlap_observations(frame: pd.DataFrame) -> list[str]:
+    """Describe each measured overlap strategy independently."""
+    observations: list[str] = []
+    if "method" in frame.columns:
+        groups = frame.groupby("method", sort=True)
+    else:
+        groups = [("intersection_only", frame)]
+    for method, group in groups:
+        ordered = group.sort_values("overlap_fraction")
+        if ordered.empty:
+            continue
+        low = ordered.iloc[0]
+        high = ordered.iloc[-1]
+        delta = float(low["pr_auc"]) - float(high["pr_auc"])
+        coverage_name = "intersection_coverage" if "intersection_coverage" in ordered else "coverage"
+        observations.append(
+            f"Partial-overlap study ({method}): PR-AUC changed by {delta:.6f} between "
+            f"overlap={float(high['overlap_fraction']):.2f} and "
+            f"overlap={float(low['overlap_fraction']):.2f}; "
+            f"{coverage_name.replace('_', ' ')} at the latter was "
+            f"{float(low[coverage_name]):.6f}."
+        )
+    return observations
 
 
 def _dropout_observations(frame: pd.DataFrame) -> list[str]:
@@ -143,7 +155,7 @@ def build_data_driven_report(
     overlap = _read_csv(results_directory / "partial_overlap.csv")
     artifact_status["partial_overlap"] = overlap is not None
     if overlap is not None and not overlap.empty:
-        observations.append(_overlap_observation(overlap))
+        observations.extend(_overlap_observations(overlap))
     dropout = _read_csv(results_directory / "party_dropout.csv")
     artifact_status["party_dropout"] = dropout is not None
     if dropout is not None and not dropout.empty and "phase" in dropout:
