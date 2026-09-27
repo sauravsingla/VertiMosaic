@@ -404,24 +404,39 @@ def fetch_bank() -> ExternalDatasetBundle:
     targets = data.data.targets
     target = pd.to_numeric(targets.iloc[:, 0], errors="coerce") if targets is not None else None
     prepared, provenance = prepare_bank_frame(features)
+    raw_rows = len(features)
     return ExternalDatasetBundle(
         "bank",
         prepared,
         target,
         provenance,
-        {"dataset_id": 350, "provider": "UCI", "retrieval_date": date.today().isoformat()},
+        {
+            "dataset_id": 350,
+            "provider": "UCI",
+            "retrieval_date": date.today().isoformat(),
+            "raw_rows": raw_rows,
+            "source_raw_rows": {"bank": raw_rows},
+        },
     )
 
 
 def fetch_telecom() -> ExternalDatasetBundle:
     data = fetch_ucirepo(id=563)
-    prepared, provenance = prepare_telecom_frame(data.data.features.copy())
+    features = data.data.features.copy()
+    prepared, provenance = prepare_telecom_frame(features)
+    raw_rows = len(features)
     return ExternalDatasetBundle(
         "telecom",
         prepared,
         None,
         provenance,
-        {"dataset_id": 563, "provider": "UCI", "retrieval_date": date.today().isoformat()},
+        {
+            "dataset_id": 563,
+            "provider": "UCI",
+            "retrieval_date": date.today().isoformat(),
+            "raw_rows": raw_rows,
+            "source_raw_rows": {"telecom": raw_rows},
+        },
     )
 
 
@@ -430,6 +445,10 @@ def fetch_insurance(sample_size: int | None = None, seed: int = 42) -> ExternalD
     sev = fetch_openml(data_id=41215, as_frame=True, parser="auto")
     frequency = freq.frame.copy()
     severity = sev.frame.copy()
+    source_raw_rows = {
+        "insurance_freq": len(frequency),
+        "insurance_sev": len(severity),
+    }
     if sample_size is not None and sample_size < len(frequency):
         frequency = frequency.sample(n=sample_size, random_state=seed)
         severity = severity[severity["IDpol"].isin(frequency["IDpol"])].copy()
@@ -445,6 +464,8 @@ def fetch_insurance(sample_size: int | None = None, seed: int = 42) -> ExternalD
             "provider": "OpenML",
             "retrieval_date": date.today().isoformat(),
             "license": details.get("licence") or details.get("license"),
+            "raw_rows": source_raw_rows["insurance_freq"],
+            "source_raw_rows": source_raw_rows,
         },
     )
 
@@ -454,13 +475,21 @@ def fetch_retail() -> ExternalDatasetBundle:
     raw = getattr(data.data, "original", None)
     if raw is None:
         raw = data.data.features
-    prepared, provenance = prepare_retail_transactions(raw.copy())
+    raw_frame = raw.copy()
+    prepared, provenance = prepare_retail_transactions(raw_frame)
+    raw_rows = len(raw_frame)
     return ExternalDatasetBundle(
         "retail",
         prepared,
         None,
         provenance,
-        {"dataset_id": 352, "provider": "UCI", "retrieval_date": date.today().isoformat()},
+        {
+            "dataset_id": 352,
+            "provider": "UCI",
+            "retrieval_date": date.today().isoformat(),
+            "raw_rows": raw_rows,
+            "source_raw_rows": {"retail": raw_rows},
+        },
     )
 
 
