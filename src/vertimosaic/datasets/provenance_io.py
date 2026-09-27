@@ -52,10 +52,18 @@ def _source_records(bundle: ExternalDatasetBundle) -> list[dict[str, Any]]:
             # underlying source, so preserve the unknown value explicitly.
             record["raw_rows"] = None
         source_license = source_licenses.get(key)
+        if not isinstance(source_license, str) or not source_license.strip():
+            if len(keys) == 1 and isinstance(runtime_license, str) and runtime_license.strip():
+                source_license = runtime_license
+            elif record.get("license") is None:
+                source_license = registry.runtime_license(key)
         if isinstance(source_license, str) and source_license.strip():
             record["license"] = source_license.strip()
-        elif len(keys) == 1 and isinstance(runtime_license, str) and runtime_license.strip():
-            record["license"] = runtime_license.strip()
+        if record.get("license") is None:
+            raise RuntimeError(
+                f"license metadata could not be verified for source {key}; "
+                "provenance persistence stopped conservatively"
+            )
         records.append(record)
     return records
 
