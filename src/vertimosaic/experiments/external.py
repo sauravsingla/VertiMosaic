@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -8,6 +9,7 @@ import pandas as pd
 from vertimosaic.datasets import DatasetRegistry, ExternalDatasetBundle, fetch_external_party
 from vertimosaic.linkage import GaussianCopulaLinker, LinkageManifest
 from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.provenance import FeatureProvenance
 
 
 @dataclass(frozen=True)
@@ -17,6 +19,8 @@ class ExternalBenchmark:
     linkage_manifests: dict[str, LinkageManifest]
     mode: str
     feature_frames: dict[str, pd.DataFrame]
+    source_metadata: dict[str, dict[str, Any]]
+    source_provenance: dict[str, list[FeatureProvenance]]
 
 
 def _numeric_matrix(frame: pd.DataFrame) -> np.ndarray:
@@ -160,6 +164,8 @@ def prepare_external_benchmark(
         linkage_manifests=manifests,
         mode=mode,
         feature_frames=feature_frames,
+        source_metadata={name: dict(bundle.metadata) for name, bundle in bundles.items()},
+        source_provenance={name: list(bundle.provenance) for name, bundle in bundles.items()},
     )
 
 
