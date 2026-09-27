@@ -85,7 +85,7 @@ class RunArtifacts:
     @classmethod
     def create(cls, root: Path = Path("runs"), run_id: str | None = None) -> RunArtifacts:
         if run_id is None:
-            timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
             run_id = f"run-{timestamp}-{os.getpid()}"
         obj = cls(root=root, run_id=run_id)
         obj.directory.mkdir(parents=True, exist_ok=False)
