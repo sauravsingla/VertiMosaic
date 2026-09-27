@@ -20,7 +20,8 @@ def _validate_fields(fields: Mapping[str, Any]) -> dict[str, str | int | float |
             raise UnsafeLogFieldError("structured log field names must be non-empty strings")
         if not isinstance(value, _ALLOWED_SCALARS):
             raise UnsafeLogFieldError(
-                f"structured log field {key!r} must be scalar metadata; row-level values are forbidden"
+                f"structured log field {key!r} must be scalar metadata; "
+                "row-level values are forbidden"
             )
         safe[key] = value
     return safe
