@@ -10,4 +10,4 @@ VertiMosaic source code is Apache-2.0. That license does **not** relicense exter
 | Retail | Online Retail | UCI 352 | 10.24432/C5BW33 | UCI reports CC BY 4.0 |
 | Optional | IEEE-CIS Fraud Detection | Kaggle competition data | n/a | User-supplied authorized local files only; never redistributed |
 
-Runtime provenance records provider metadata, retrieval time, row counts and available checksums.
+Downloaded artifact metadata combines the machine-readable registry fields with the runtime retrieval date and processed row count. VertiMosaic also records a SHA-256 checksum of the **processed feature parquet it creates** and labels that checksum scope explicitly. It does not present this as a provider-supplied raw-source checksum. Raw-source checksums or raw row counts that are not exposed by the provider/loader remain `null` rather than being invented.
