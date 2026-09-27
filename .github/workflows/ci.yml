@@ -20,5 +20,8 @@ jobs:
       - run: mypy src/vertimosaic
       - run: pytest -q --cov=vertimosaic --cov-report=term-missing
       - run: vertimosaic demo --rows 1000 --seed 42
+      - name: Complete CPU paper smoke pipeline
+        if: matrix.python-version == '3.12'
+        run: python scripts/reproduce_paper.py --smoke
       - run: python -m build
       - run: twine check dist/*
