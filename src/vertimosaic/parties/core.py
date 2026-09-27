@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import TypedDict
 
 import numpy as np
 
@@ -8,6 +9,37 @@ import numpy as np
 @dataclass
 class Party:
     name: str
+
+
+@dataclass(frozen=True)
+class OpaqueSplitReference:
+    """Opaque party-local feature/bin reference for a histogram split.
+
+    The numeric threshold is intentionally encapsulated and has no public accessor.
+    This is a protocol-boundary abstraction for the in-process research simulator,
+    not cryptographic protection against Python introspection.
+    """
+
+    feature_ref: int
+    bin_ref: int
+    _threshold: float = field(repr=False, compare=False)
+
+    def apply(
+        self, party: PassiveParty, indices: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        return party._route_with_threshold(indices, self.feature_ref, self._threshold)
+
+
+class HistogramCandidate(TypedDict):
+    """Protocol-visible aggregate statistics plus an opaque local split reference."""
+
+    split_ref: OpaqueSplitReference
+    g_left: float
+    h_left: float
+    g_right: float
+    h_right: float
+    n_left: int
+    n_right: int
 
 
 @dataclass
@@ -44,9 +76,10 @@ class PassiveParty(Party):
         max_bins: int,
         min_samples_leaf: int,
         feature_indices: np.ndarray | None = None,
-    ) -> list[dict[str, float | int]]:
+    ) -> list[HistogramCandidate]:
+        """Compute local split statistics without exposing numeric thresholds."""
         x = self._x[indices]
-        out: list[dict[str, float | int]] = []
+        out: list[HistogramCandidate] = []
         if len(indices) < 2 * min_samples_leaf:
             return out
         if feature_indices is None:
@@ -57,7 +90,9 @@ class PassiveParty(Party):
                 raise ValueError("feature_indices contain an out-of-range feature")
         for feature_idx in features:
             values = x[:, feature_idx]
-            quantiles = np.unique(np.quantile(values, np.linspace(0.0, 1.0, max_bins + 1)[1:-1]))
+            quantiles = np.unique(
+                np.quantile(values, np.linspace(0.0, 1.0, max_bins + 1)[1:-1])
+            )
             for threshold_idx, threshold in enumerate(quantiles):
                 left = values <= threshold
                 n_left = int(left.sum())
@@ -70,9 +105,11 @@ class PassiveParty(Party):
                 h_right = float(hessians[indices][~left].sum())
                 out.append(
                     {
-                        "feature": int(feature_idx),
-                        "threshold_index": threshold_idx,
-                        "threshold": float(threshold),
+                        "split_ref": OpaqueSplitReference(
+                            feature_ref=int(feature_idx),
+                            bin_ref=int(threshold_idx),
+                            _threshold=float(threshold),
+                        ),
                         "g_left": g_left,
                         "h_left": h_left,
                         "g_right": g_right,
@@ -83,12 +120,26 @@ class PassiveParty(Party):
                 )
         return out
 
-    def route(
+    def _route_with_threshold(
         self, indices: np.ndarray, feature_idx: int, threshold: float
     ) -> tuple[np.ndarray, np.ndarray]:
+        if feature_idx < 0 or feature_idx >= self.n_features:
+            raise ValueError("split feature reference is out of range for this party")
         values = self._x[indices, feature_idx]
         left_mask = values <= threshold
         return indices[left_mask], indices[~left_mask]
+
+    def route_split(
+        self, indices: np.ndarray, split_ref: OpaqueSplitReference
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Apply an opaque split locally; the caller never receives its threshold."""
+        return split_ref.apply(self, indices)
+
+    def route(
+        self, indices: np.ndarray, feature_idx: int, threshold: float
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Direct local routing helper retained for controlled tests and diagnostics."""
+        return self._route_with_threshold(indices, feature_idx, threshold)
 
 
 @dataclass
