@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 
@@ -26,7 +26,7 @@ class StructuredPayload:
 
 @dataclass(frozen=True)
 class Message:
-    """Ephemeral envelope for one simulated federated communication."""
+    """Ephemeral envelope for one federated communication."""
 
     message_type: str
     sender_role: str
@@ -67,6 +67,28 @@ class AuditEvent:
             message.stage,
             message.step,
         )
+
+
+@runtime_checkable
+class Transport(Protocol):
+    """Structural interface used by VertiMosaic protocol message transports."""
+
+    audit_log: list[AuditEvent]
+
+    def send(
+        self,
+        payload: Any,
+        *,
+        message_type: str,
+        sender_role: str,
+        receiver_role: str,
+        direction: str | None = None,
+        stage: str | None = None,
+        step: int | None = None,
+    ) -> Any: ...
+
+    @property
+    def estimated_payload_bytes(self) -> int: ...
 
 
 @dataclass
