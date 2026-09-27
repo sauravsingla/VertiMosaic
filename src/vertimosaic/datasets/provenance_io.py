@@ -14,13 +14,6 @@ from vertimosaic.datasets.external import (
 )
 from vertimosaic.datasets.registry import DatasetRegistry
 
-_PARTY_REGISTRY_KEYS: dict[str, tuple[str, ...]] = {
-    "bank": ("bank",),
-    "telecom": ("telecom",),
-    "insurance": ("insurance_freq", "insurance_sev"),
-    "retail": ("retail",),
-}
-
 
 def _file_sha256(path: Path) -> str:
     digest = sha256()
@@ -34,11 +27,14 @@ def _source_records(bundle: ExternalDatasetBundle) -> list[dict[str, Any]]:
     registry = DatasetRegistry()
     retrieval_date = str(bundle.metadata.get("retrieval_date") or date.today().isoformat())
     runtime_license = bundle.metadata.get("license")
+    source_licenses = bundle.metadata.get("source_licenses", {})
+    if not isinstance(source_licenses, dict):
+        source_licenses = {}
     raw_rows = bundle.metadata.get("raw_rows")
     source_raw_rows = bundle.metadata.get("source_raw_rows", {})
     if not isinstance(source_raw_rows, dict):
         source_raw_rows = {}
-    keys = _PARTY_REGISTRY_KEYS.get(bundle.party, ())
+    keys = registry.keys_for_party(bundle.party)
     records: list[dict[str, Any]] = []
     for key in keys:
         record = dict(registry.describe(key))
@@ -55,7 +51,10 @@ def _source_records(bundle: ExternalDatasetBundle) -> list[dict[str, Any]]:
             # A combined multi-source row count cannot safely be assigned to either
             # underlying source, so preserve the unknown value explicitly.
             record["raw_rows"] = None
-        if isinstance(runtime_license, str) and runtime_license.strip():
+        source_license = source_licenses.get(key)
+        if isinstance(source_license, str) and source_license.strip():
+            record["license"] = source_license.strip()
+        elif len(keys) == 1 and isinstance(runtime_license, str) and runtime_license.strip():
             record["license"] = runtime_license.strip()
         records.append(record)
     return records
