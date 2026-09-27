@@ -1,9 +1,11 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 
+import vertimosaic.datasets.external as external_datasets
 from vertimosaic.datasets import ExternalDatasetBundle
 from vertimosaic.experiments.external_run import run_external_experiment
 from vertimosaic.provenance import FeatureProvenance
@@ -30,12 +32,26 @@ def _bundle(
         )
         for column in frame.columns
     ]
+    metadata: dict[str, object] = {
+        "license": "test-license",
+        "processed_rows": len(frame),
+        "retrieval_date": "2026-09-27",
+    }
+    if party == "insurance":
+        metadata["source_licenses"] = {
+            "insurance_freq": "test-license-frequency",
+            "insurance_sev": "test-license-severity",
+        }
+        metadata["source_raw_rows"] = {
+            "insurance_freq": len(frame),
+            "insurance_sev": len(frame),
+        }
     return ExternalDatasetBundle(
         party=party,
         features=frame,
         target=target,
         provenance=provenance,
-        metadata={"license": "test-license", "processed_rows": len(frame)},
+        metadata=metadata,
     )
 
 
@@ -89,6 +105,44 @@ def test_external_experiment_writes_complete_reproducibility_bundle(
     assert metrics["data_preparation_seconds"] >= 0.0
     assert metrics["training_steps"] > 0
     assert metrics["communication"]["traffic_type"] == "SIMULATED PAYLOAD SIZE"
+    provenance_payload = json.loads(
+        (run_directory / "dataset_provenance.json").read_text(encoding="utf-8")
+    )
+    insurance_sources = provenance_payload["sources"]["insurance"]["sources"]
+    assert [source["dataset_id"] for source in insurance_sources] == ["41214", "41215"]
+    assert [source["license"] for source in insurance_sources] == [
+        "test-license-frequency",
+        "test-license-severity",
+    ]
+
+
+def test_retail_fetch_applies_source_time_cutoff_before_customer_aggregation(monkeypatch) -> None:
+    transactions = pd.DataFrame(
+        {
+            "InvoiceNo": ["1", "2", "3", "4"],
+            "StockCode": ["A", "B", "C", "D"],
+            "Quantity": [1, 2, 1, 100],
+            "InvoiceDate": pd.to_datetime(
+                ["2020-01-01", "2020-01-02", "2020-01-03", "2020-02-01"]
+            ),
+            "UnitPrice": [10.0, 5.0, 3.0, 999.0],
+            "CustomerID": [101, 101, 202, 101],
+            "Description": ["a", "b", "c", "future"],
+            "Country": ["UK", "UK", "UK", "UK"],
+        }
+    )
+    fake = SimpleNamespace(data=SimpleNamespace(original=transactions, features=transactions))
+    monkeypatch.setattr(external_datasets, "fetch_ucirepo", lambda id: fake)
+
+    bundle = external_datasets.fetch_retail(feature_cutoff="2020-01-03")
+
+    assert bundle.metadata["future_rows_excluded"] == 1
+    assert str(bundle.metadata["feature_cutoff"]).startswith("2020-01-03")
+    assert bundle.metadata["temporal_leakage_control"] == (
+        "aggregate transactions at or before cutoff before linkage"
+    )
+    assert float(bundle.features["total_spend"].max()) == 20.0
+    assert all("at or before 2020-01-03" in item.transformation for item in bundle.provenance)
 
 
 def test_run_artifact_ids_do_not_collide_within_same_second(tmp_path: Path) -> None:
