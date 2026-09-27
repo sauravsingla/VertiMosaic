@@ -4,14 +4,7 @@ import json
 from pathlib import Path
 from typing import SupportsFloat, SupportsIndex, cast
 
-import numpy as np
-
-from vertimosaic.evaluation import entity_level_split, select_f1_threshold
-from vertimosaic.experiments.external import prepare_external_benchmark
-from vertimosaic.experiments.external_preprocessing import prepare_external_splits_locally
-from vertimosaic.models import VFLLogisticRegression
-from vertimosaic.parties import ActiveParty, PassiveParty
-from vertimosaic.reporting import select_sanitized_case_study
+from vertimosaic.experiments.external_run import run_external_experiment
 
 
 def _numeric(value: object) -> float:
@@ -24,81 +17,32 @@ def run_distributed_signal_case_study(
     seed: int = 42,
     cross_party_correlation: float = 0.25,
     insurance_sample_size: int | None = None,
+    bootstrap_replicates: int = 1000,
+    runs_root: Path = Path("runs"),
     output_json: Path = Path("reports/case_study.json"),
     output_markdown: Path = Path("reports/case_study.md"),
 ) -> dict[str, object]:
-    """Generate one measured, sanitized case study from distributed-signal external data."""
-    benchmark = prepare_external_benchmark(
+    """Generate a measured sanitized case study plus the standard experiment run bundle."""
+    payload = run_external_experiment(
         mode="distributed_signal_external",
+        model_name="logistic",
+        seed=seed,
         cross_party_correlation=cross_party_correlation,
-        seed=seed,
         insurance_sample_size=insurance_sample_size,
+        bootstrap_replicates=bootstrap_replicates,
+        write_run=True,
+        runs_root=runs_root,
     )
-    split = entity_level_split(benchmark.active.labels, seed=seed)
-    prepared = prepare_external_splits_locally(benchmark, split)
-    train_active = prepared.train_active
-    train_passive = prepared.train_passive
-    val_active = prepared.validation_active
-    val_passive = prepared.validation_passive
-    test_active = prepared.test_active
-    test_passive = prepared.test_passive
-
-    full_model = VFLLogisticRegression(
-        learning_rate=0.08,
-        max_iter=500,
-        l2=1e-3,
-        early_stopping_rounds=5,
-        seed=seed,
-    )
-    full_model.fit(train_active, train_passive, val_active, val_passive)
-    bank_model = VFLLogisticRegression(
-        learning_rate=0.08,
-        max_iter=500,
-        l2=1e-3,
-        early_stopping_rounds=5,
-        seed=seed,
-    )
-    bank_model.fit(train_active, [], val_active, [])
-
-    validation_probability = full_model.predict_proba([val_active, *val_passive])[:, 1]
-    threshold = select_f1_threshold(val_active.labels, validation_probability)
-    full_probability = full_model.predict_proba([test_active, *test_passive])[:, 1]
-    bank_probability = bank_model.predict_proba([test_active])[:, 1]
-
-    rng = np.random.default_rng(seed + 10_000)
-    permuted: dict[str, np.ndarray] = {}
-    for party_name in ("bank", "telecom", "insurance", "retail"):
-        permutation = rng.permutation(test_active.n_rows)
-        if party_name == "bank":
-            active_eval = ActiveParty(
-                "bank",
-                test_active._x[permutation],
-                test_active.labels,
-            )
-            passive_eval = test_passive
-        else:
-            active_eval = test_active
-            passive_eval = [
-                PassiveParty(
-                    party.name,
-                    party._x[permutation] if party.name == party_name else party._x,
-                )
-                for party in test_passive
-            ]
-        permuted[party_name] = full_model.predict_proba([active_eval, *passive_eval])[:, 1]
-
-    result = select_sanitized_case_study(
-        split.test,
-        bank_probability,
-        full_probability,
-        permuted,
-        threshold=threshold,
-    )
+    raw_case = payload.get("case_study")
+    if not isinstance(raw_case, dict):
+        raise RuntimeError("distributed-signal external run did not produce a case study")
+    result: dict[str, object] = dict(raw_case)
     result["benchmark_mode"] = "distributed_signal_external"
     result["cross_party_correlation"] = cross_party_correlation
     result["raw_passive_features_exposed"] = False
     result["preprocessing_fit_scope"] = "TRAIN only, independently per party"
-    result["preprocessor_artifacts"] = prepared.preprocessor_paths
+    result["preprocessor_artifacts"] = payload["preprocessor_artifacts"]
+    result["run_directory"] = payload["run_directory"]
 
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -123,6 +67,7 @@ def run_distributed_signal_case_study(
             "",
             "These are party-representation permutation probability deltas, not causal importance.",
             "No passive raw feature values are included in this report.",
+            f"Full reproducibility bundle: `{result['run_directory']}`",
         ]
     )
     output_markdown.write_text("\n".join(lines) + "\n", encoding="utf-8")
