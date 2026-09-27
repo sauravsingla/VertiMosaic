@@ -24,9 +24,7 @@ class OpaqueSplitReference:
     bin_ref: int
     _threshold: float = field(repr=False, compare=False)
 
-    def apply(
-        self, party: PassiveParty, indices: np.ndarray
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def apply(self, party: PassiveParty, indices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         return party._route_with_threshold(indices, self.feature_ref, self._threshold)
 
 
@@ -90,9 +88,7 @@ class PassiveParty(Party):
                 raise ValueError("feature_indices contain an out-of-range feature")
         for feature_idx in features:
             values = x[:, feature_idx]
-            quantiles = np.unique(
-                np.quantile(values, np.linspace(0.0, 1.0, max_bins + 1)[1:-1])
-            )
+            quantiles = np.unique(np.quantile(values, np.linspace(0.0, 1.0, max_bins + 1)[1:-1]))
             for threshold_idx, threshold in enumerate(quantiles):
                 left = values <= threshold
                 n_left = int(left.sum())
