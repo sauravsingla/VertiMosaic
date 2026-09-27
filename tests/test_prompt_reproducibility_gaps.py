@@ -45,9 +45,7 @@ def _bundle(
         "retrieval_date": "2026-09-27",
         "raw_rows": len(frame),
         "source_raw_rows": {key: len(frame) for key in keys},
-        "source_checksums": {
-            key: f"{index + 1:064x}" for index, key in enumerate(keys)
-        },
+        "source_checksums": {key: f"{index + 1:064x}" for index, key in enumerate(keys)},
         "source_checksum_algorithm": "sha256",
         "source_checksum_scope": "test-retrieved-frame",
     }
@@ -133,9 +131,7 @@ def test_retail_fetch_applies_source_time_cutoff_before_customer_aggregation(mon
             "InvoiceNo": ["1", "2", "3", "4"],
             "StockCode": ["A", "B", "C", "D"],
             "Quantity": [1, 2, 1, 100],
-            "InvoiceDate": pd.to_datetime(
-                ["2020-01-01", "2020-01-02", "2020-01-03", "2020-02-01"]
-            ),
+            "InvoiceDate": pd.to_datetime(["2020-01-01", "2020-01-02", "2020-01-03", "2020-02-01"]),
             "UnitPrice": [10.0, 5.0, 3.0, 999.0],
             "CustomerID": [101, 101, 202, 101],
             "Description": ["a", "b", "c", "future"],
