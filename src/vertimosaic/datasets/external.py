@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from datetime import date
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,29 @@ def _numeric(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
 def _safe_ratio(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     denom = denominator.replace(0, np.nan)
     return (numerator / denom).replace([np.inf, -np.inf], np.nan)
+
+
+def _frame_sha256(frame: pd.DataFrame) -> str:
+    """Hash one retrieved source-frame capture before transformation or sampling."""
+    digest = sha256()
+    schema = [(str(column), str(dtype)) for column, dtype in frame.dtypes.items()]
+    digest.update(json.dumps(schema, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+    hashed = pd.util.hash_pandas_object(frame, index=True, categorize=True).to_numpy(dtype=np.uint64)
+    digest.update(hashed.tobytes())
+    return digest.hexdigest()
+
+
+def _uci_source_capture(
+    features: pd.DataFrame,
+    targets: pd.DataFrame | None,
+    original: pd.DataFrame | None,
+) -> pd.DataFrame:
+    if original is not None:
+        return original.copy()
+    frames = [features.reset_index(drop=True)]
+    if targets is not None:
+        frames.append(targets.reset_index(drop=True))
+    return pd.concat(frames, axis=1)
 
 
 def _record(
@@ -419,9 +443,12 @@ def fetch_bank() -> ExternalDatasetBundle:
     data = fetch_ucirepo(id=350)
     features = data.data.features.copy()
     targets = data.data.targets
+    target_frame = targets.copy() if targets is not None else None
+    original = getattr(data.data, "original", None)
+    source_frame = _uci_source_capture(features, target_frame, original)
     target = pd.to_numeric(targets.iloc[:, 0], errors="coerce") if targets is not None else None
     prepared, provenance = prepare_bank_frame(features)
-    raw_rows = len(features)
+    raw_rows = len(source_frame)
     return ExternalDatasetBundle(
         "bank",
         prepared,
@@ -433,6 +460,9 @@ def fetch_bank() -> ExternalDatasetBundle:
             "retrieval_date": date.today().isoformat(),
             "raw_rows": raw_rows,
             "source_raw_rows": {"bank": raw_rows},
+            "source_checksums": {"bank": _frame_sha256(source_frame)},
+            "source_checksum_algorithm": "sha256",
+            "source_checksum_scope": "retrieved_dataframe_content_before_transformation",
         },
     )
 
@@ -440,8 +470,12 @@ def fetch_bank() -> ExternalDatasetBundle:
 def fetch_telecom() -> ExternalDatasetBundle:
     data = fetch_ucirepo(id=563)
     features = data.data.features.copy()
+    targets = data.data.targets
+    target_frame = targets.copy() if targets is not None else None
+    original = getattr(data.data, "original", None)
+    source_frame = _uci_source_capture(features, target_frame, original)
     prepared, provenance = prepare_telecom_frame(features)
-    raw_rows = len(features)
+    raw_rows = len(source_frame)
     return ExternalDatasetBundle(
         "telecom",
         prepared,
@@ -453,6 +487,9 @@ def fetch_telecom() -> ExternalDatasetBundle:
             "retrieval_date": date.today().isoformat(),
             "raw_rows": raw_rows,
             "source_raw_rows": {"telecom": raw_rows},
+            "source_checksums": {"telecom": _frame_sha256(source_frame)},
+            "source_checksum_algorithm": "sha256",
+            "source_checksum_scope": "retrieved_dataframe_content_before_transformation",
         },
     )
 
@@ -466,11 +503,20 @@ def fetch_insurance(sample_size: int | None = None, seed: int = 42) -> ExternalD
         "insurance_freq": len(frequency),
         "insurance_sev": len(severity),
     }
+    source_checksums = {
+        "insurance_freq": _frame_sha256(frequency),
+        "insurance_sev": _frame_sha256(severity),
+    }
+    frequency_details = getattr(freq, "details", {}) or {}
+    severity_details = getattr(sev, "details", {}) or {}
+    source_licenses = {
+        "insurance_freq": frequency_details.get("licence") or frequency_details.get("license"),
+        "insurance_sev": severity_details.get("licence") or severity_details.get("license"),
+    }
     if sample_size is not None and sample_size < len(frequency):
         frequency = frequency.sample(n=sample_size, random_state=seed)
         severity = severity[severity["IDpol"].isin(frequency["IDpol"])].copy()
     prepared, provenance = prepare_insurance_frames(frequency, severity)
-    details = getattr(freq, "details", {}) or {}
     return ExternalDatasetBundle(
         "insurance",
         prepared,
@@ -480,9 +526,13 @@ def fetch_insurance(sample_size: int | None = None, seed: int = 42) -> ExternalD
             "dataset_id": "41214+41215",
             "provider": "OpenML",
             "retrieval_date": date.today().isoformat(),
-            "license": details.get("licence") or details.get("license"),
+            "license": source_licenses["insurance_freq"],
+            "source_licenses": source_licenses,
             "raw_rows": source_raw_rows["insurance_freq"],
             "source_raw_rows": source_raw_rows,
+            "source_checksums": source_checksums,
+            "source_checksum_algorithm": "sha256",
+            "source_checksum_scope": "retrieved_dataframe_content_before_sampling_or_transformation",
         },
     )
 
@@ -518,6 +568,7 @@ def fetch_retail(
     if raw is None:
         raw = data.data.features
     raw_frame = raw.copy()
+    source_checksum = _frame_sha256(raw_frame)
     cutoff, cutoff_policy = _resolve_retail_cutoff(
         raw_frame,
         feature_cutoff=feature_cutoff,
@@ -538,6 +589,9 @@ def fetch_retail(
             "retrieval_date": date.today().isoformat(),
             "raw_rows": raw_rows,
             "source_raw_rows": {"retail": raw_rows},
+            "source_checksums": {"retail": source_checksum},
+            "source_checksum_algorithm": "sha256",
+            "source_checksum_scope": "retrieved_dataframe_content_before_cutoff_or_transformation",
             "feature_cutoff": cutoff.isoformat(),
             "feature_cutoff_policy": cutoff_policy,
             "future_rows_excluded": future_rows_excluded,
