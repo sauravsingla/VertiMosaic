@@ -5,8 +5,8 @@ from vertimosaic.datasets.external import (
     prepare_insurance_frames,
     prepare_retail_transactions,
     prepare_telecom_frame,
-    save_bundle,
 )
+from vertimosaic.datasets.provenance_io import save_bundle
 from vertimosaic.datasets.registry import DatasetRecord, DatasetRegistry
 from vertimosaic.datasets.synthetic import make_vertical_synthetic
 
