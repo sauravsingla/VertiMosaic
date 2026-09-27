@@ -320,7 +320,12 @@ def run_dropout_study(
         communications.append(model_communication_frame(availability_model, condition=condition))
 
     histories.append(model_training_frame(full_model, condition="full_training"))
-    communications.append(model_communication_frame(full_model, condition="full_training_and_inference"))
+    communications.append(
+        model_communication_frame(
+            full_model,
+            condition="full_training_and_inference",
+        )
+    )
     frame = pd.DataFrame(records)
     if write_run:
         run_id, directory = write_synthetic_study_run(
