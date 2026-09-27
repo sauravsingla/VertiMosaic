@@ -8,6 +8,14 @@ import pandas as pd
 from vertimosaic.transport import AuditEvent
 
 
+def _party_for_event(event: AuditEvent) -> str:
+    if event.direction == "backward":
+        return event.receiver_role
+    if event.direction == "forward":
+        return event.sender_role
+    return event.sender_role
+
+
 def communication_event_frame(events: Iterable[AuditEvent]) -> pd.DataFrame:
     """Return metadata-only per-message communication telemetry with cumulative payload."""
     rows: list[dict[str, Any]] = []
@@ -18,6 +26,7 @@ def communication_event_frame(events: Iterable[AuditEvent]) -> pd.DataFrame:
             {
                 "sequence": sequence,
                 "direction": event.direction or "unspecified",
+                "party": _party_for_event(event),
                 "stage": event.stage or "unspecified",
                 "step": event.step,
                 "message_type": event.message_type,
@@ -57,7 +66,7 @@ def communication_breakdown(events: Iterable[AuditEvent]) -> pd.DataFrame:
         return pd.DataFrame(
             columns=[
                 "direction",
-                "sender_role",
+                "party",
                 "stage",
                 "step",
                 "message_count",
@@ -67,7 +76,7 @@ def communication_breakdown(events: Iterable[AuditEvent]) -> pd.DataFrame:
         )
     grouped = (
         frame.groupby(
-            ["direction", "sender_role", "stage", "step"],
+            ["direction", "party", "stage", "step"],
             dropna=False,
             sort=True,
         )
