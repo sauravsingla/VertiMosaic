@@ -77,6 +77,7 @@ def test_external_loaders_record_measured_raw_source_rows_and_checksums(monkeypa
         assert all(len(str(checksums[key])) == 64 for key in keys)
         assert bundle.metadata["source_checksum_algorithm"] == "sha256"
 
-    assert insurance.metadata["source_checksums"]["insurance_freq"] != insurance.metadata[
-        "source_checksums"
-    ]["insurance_sev"]
+    assert (
+        insurance.metadata["source_checksums"]["insurance_freq"]
+        != insurance.metadata["source_checksums"]["insurance_sev"]
+    )
