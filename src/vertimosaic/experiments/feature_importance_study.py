@@ -50,7 +50,7 @@ def run_feature_importance_study(
         seed=seed,
     )
     gbdt.fit(train_active, train_passive)
-    gbdt_frames = gbdt_local_feature_importance(gbdt)
+    gbdt_frames = gbdt_local_feature_importance(gbdt, parties)
 
     output: dict[str, pd.DataFrame] = {}
     directory.mkdir(parents=True, exist_ok=True)
