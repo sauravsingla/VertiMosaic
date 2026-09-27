@@ -9,10 +9,7 @@ from vertimosaic.parties import ActiveParty, PassiveParty
 def _binary_log_loss(y: np.ndarray, probability: np.ndarray) -> float:
     eps = 1e-12
     return float(
-        -np.mean(
-            y * np.log(probability + eps)
-            + (1.0 - y) * np.log(1.0 - probability + eps)
-        )
+        -np.mean(y * np.log(probability + eps) + (1.0 - y) * np.log(1.0 - probability + eps))
     )
 
 
