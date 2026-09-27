@@ -17,7 +17,7 @@ from vertimosaic.evaluation import (
     select_f1_threshold,
 )
 from vertimosaic.experiments.external import linkage_manifest_dict, prepare_external_benchmark
-from vertimosaic.experiments.pipeline import slice_parties
+from vertimosaic.experiments.external_preprocessing import prepare_external_splits_locally
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
 from vertimosaic.reporting import select_sanitized_case_study
@@ -96,23 +96,32 @@ def run_external_experiment(
     bootstrap_replicates: int = 100,
     output: Path | None = None,
 ) -> dict[str, Any]:
+    preparation_start = time.perf_counter()
     benchmark = prepare_external_benchmark(
         mode=mode,
         cross_party_correlation=cross_party_correlation,
         seed=seed,
         insurance_sample_size=insurance_sample_size,
     )
+    benchmark_preparation_seconds = time.perf_counter() - preparation_start
     split = entity_level_split(benchmark.active.labels, seed=seed)
-    train_active, train_passive = slice_parties(benchmark.active, benchmark.passive, split.train)
-    val_active, val_passive = slice_parties(benchmark.active, benchmark.passive, split.validation)
-    test_active, test_passive = slice_parties(benchmark.active, benchmark.passive, split.test)
+    prepared = prepare_external_splits_locally(benchmark, split)
+    train_active = prepared.train_active
+    train_passive = prepared.train_passive
+    val_active = prepared.validation_active
+    val_passive = prepared.validation_passive
+    test_active = prepared.test_active
+    test_passive = prepared.test_passive
+
     model = _external_model(model_name, seed, early_stopping=True)
     start = time.perf_counter()
     _fit_external_model(model, train_active, train_passive, val_active, val_passive)
     training_seconds = time.perf_counter() - start
     validation_p = model.predict_proba([val_active, *val_passive])[:, 1]
     threshold = select_f1_threshold(val_active.labels, validation_p)
+    inference_start = time.perf_counter()
     test_p = model.predict_proba([test_active, *test_passive])[:, 1]
+    inference_seconds = time.perf_counter() - inference_start
     metrics = binary_metrics(test_active.labels, test_p, threshold=threshold)
     intervals = bootstrap_confidence_intervals(
         test_active.labels,
@@ -169,8 +178,13 @@ def run_external_experiment(
         "comparisons": [bank_comparison, all_party_comparison],
         "confusion_matrix": confusion_at_threshold(test_active.labels, test_p, threshold),
         "threshold_selected_on_validation": threshold,
+        "benchmark_preparation_seconds": benchmark_preparation_seconds,
+        "preprocessing_seconds": prepared.preprocessing_seconds,
         "training_seconds": training_seconds,
+        "inference_seconds": inference_seconds,
         "estimated_communication_bytes": model.transport.estimated_payload_bytes,
+        "preprocessor_artifacts": prepared.preprocessor_paths,
+        "preprocessing_fit_scope": "TRAIN only, independently per party",
         "linkage": linkage_manifest_dict(benchmark),
         "four_sources_same_real_people": False,
     }
