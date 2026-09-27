@@ -220,68 +220,64 @@ def prepare_telecom_frame(frame: pd.DataFrame) -> tuple[pd.DataFrame, list[Featu
             "Frequency of SMS,Frequency of use",
             "sms/(usage+1)",
         )
-    complains = values.get("complains")
-    if complains is not None:
-        add("complaint_indicator", (complains > 0).astype(float), "Complains", "indicator")
-    charge = values.get("charge_amount")
-    if charge is not None:
-        add("charge_level", charge, "Charge Amount", "numeric charge")
-    customer_value = values.get("customer_value")
-    if customer_value is not None:
-        scale = customer_value.std()
-        scale = scale if np.isfinite(scale) and scale > 0 else 1.0
+    if "complains" in values:
+        add("complaint_indicator", values["complains"], "Complains", "numeric indicator")
+    if "charge_amount" in values:
+        add("charge_level", values["charge_amount"], "Charge Amount", "numeric charge level")
+    if "customer_value" in values:
+        value = values["customer_value"]
+        std = float(value.std())
+        normalized_value = (value - float(value.mean())) / (std if std > 1e-12 else 1.0)
         add(
             "customer_value_normalized",
-            (customer_value - customer_value.mean()) / scale,
+            normalized_value,
             "Customer Value",
-            "z-score within source dataset",
+            "z-score within source domain",
         )
-    if "age" in values:
-        out["age"] = values["age"]
-        provenance.append(
-            _record(
-                "telecom",
-                "age",
-                "UCI Iranian Churn",
-                "Age",
-                "numeric coercion",
-                source_type="real_external",
-                observed=True,
+    for observed in ("age",):
+        if observed in values:
+            out[observed] = values[observed]
+            provenance.append(
+                _record(
+                    "telecom",
+                    observed,
+                    "UCI Iranian Churn",
+                    "Age",
+                    "numeric coercion",
+                    source_type="real_external",
+                    observed=True,
+                )
             )
-        )
     return out, provenance
 
 
 def prepare_insurance_frames(
     frequency: pd.DataFrame, severity: pd.DataFrame
 ) -> tuple[pd.DataFrame, list[FeatureProvenance]]:
-    """Merge OpenML frequency/severity sources by policy identifier and aggregate claims."""
-    sev = severity.copy()
-    if "IDpol" not in frequency.columns or "IDpol" not in sev.columns:
-        raise ValueError("insurance source requires IDpol")
-    if "ClaimAmount" not in sev.columns:
-        raise ValueError("severity source requires ClaimAmount")
-    sev["ClaimAmount"] = pd.to_numeric(sev["ClaimAmount"], errors="coerce")
-    grouped = sev.groupby("IDpol", as_index=False)["ClaimAmount"].agg(
+    """Aggregate severity by policy before joining to the frequency table."""
+    frequency = frequency.copy()
+    severity = severity.copy()
+    if "IDpol" not in frequency or "IDpol" not in severity:
+        raise ValueError("insurance frames must contain IDpol")
+    severity["ClaimAmount"] = pd.to_numeric(severity["ClaimAmount"], errors="coerce")
+    severity_agg = severity.groupby("IDpol", as_index=False)["ClaimAmount"].agg(
         total_claim_amount="sum",
         mean_claim_amount="mean",
         max_claim_amount="max",
     )
-    merged = frequency.merge(grouped, on="IDpol", how="left")
-    claim_columns = ["total_claim_amount", "mean_claim_amount", "max_claim_amount"]
-    merged[claim_columns] = merged[claim_columns].fillna(0.0)
+    merged = frequency.merge(severity_agg, on="IDpol", how="left")
     out = pd.DataFrame(index=merged.index)
     provenance: list[FeatureProvenance] = []
     numeric_map = {
-        "claim_count": "ClaimNb",
-        "exposure": "Exposure",
-        "bonus_malus": "BonusMalus",
-        "vehicle_age": "VehAge",
-        "driver_age": "DrivAge",
-        "vehicle_power": "VehPower",
-        "density": "Density",
+        "ClaimNb": "claim_count",
+        "Exposure": "exposure",
+        "BonusMalus": "bonus_malus",
+        "VehAge": "vehicle_age",
+        "DrivAge": "driver_age",
+        "VehPower": "vehicle_power",
+        "Density": "density",
     }
-    for name, source in numeric_map.items():
+    for source, name in numeric_map.items():
         if source in merged.columns:
             out[name] = pd.to_numeric(merged[source], errors="coerce")
             provenance.append(
@@ -291,12 +287,33 @@ def prepare_insurance_frames(
                     "OpenML freMTPL2freq/freMTPL2sev",
                     source,
                     "numeric coercion",
+                    source_type="real_external",
+                    observed=True,
                 )
             )
     if "claim_count" in out:
         out["has_claim"] = (out["claim_count"] > 0).astype(float)
-        exposure = out.get("exposure", pd.Series(1.0, index=out.index))
-        out["claim_frequency"] = _safe_ratio(out["claim_count"], exposure)
+        provenance.append(
+            _record(
+                "insurance",
+                "has_claim",
+                "OpenML freMTPL2freq/freMTPL2sev",
+                "ClaimNb",
+                "ClaimNb > 0",
+            )
+        )
+        if "exposure" in out:
+            out["claim_frequency"] = _safe_ratio(out["claim_count"], out["exposure"])
+            provenance.append(
+                _record(
+                    "insurance",
+                    "claim_frequency",
+                    "OpenML freMTPL2freq/freMTPL2sev",
+                    "ClaimNb,Exposure",
+                    "ClaimNb / Exposure",
+                )
+            )
+    claim_columns = ["total_claim_amount", "mean_claim_amount", "max_claim_amount"]
     for source in claim_columns:
         out[source] = pd.to_numeric(merged[source], errors="coerce")
         provenance.append(
@@ -470,13 +487,45 @@ def fetch_insurance(sample_size: int | None = None, seed: int = 42) -> ExternalD
     )
 
 
-def fetch_retail() -> ExternalDatasetBundle:
+def _resolve_retail_cutoff(
+    transactions: pd.DataFrame,
+    *,
+    feature_cutoff: pd.Timestamp | str | None,
+    cutoff_quantile: float,
+) -> tuple[pd.Timestamp, str]:
+    if not 0.0 < cutoff_quantile < 1.0:
+        raise ValueError("retail cutoff_quantile must be in (0, 1)")
+    timestamps = pd.to_datetime(transactions["InvoiceDate"], errors="coerce").dropna()
+    if timestamps.empty:
+        raise ValueError("retail source contains no valid InvoiceDate values")
+    if feature_cutoff is not None:
+        cutoff = pd.Timestamp(feature_cutoff)
+        if pd.isna(cutoff):
+            raise ValueError("retail feature_cutoff must be a valid timestamp")
+        return cutoff, "explicit source-time feature cutoff"
+    cutoff = pd.Timestamp(timestamps.quantile(cutoff_quantile))
+    return cutoff, f"source-time InvoiceDate quantile {cutoff_quantile:.2f}"
+
+
+def fetch_retail(
+    *,
+    feature_cutoff: pd.Timestamp | str | None = None,
+    cutoff_quantile: float = 0.70,
+) -> ExternalDatasetBundle:
+    """Fetch Retail and build a leakage-safe customer snapshot before any cross-domain linkage."""
     data = fetch_ucirepo(id=352)
     raw = getattr(data.data, "original", None)
     if raw is None:
         raw = data.data.features
     raw_frame = raw.copy()
-    prepared, provenance = prepare_retail_transactions(raw_frame)
+    cutoff, cutoff_policy = _resolve_retail_cutoff(
+        raw_frame,
+        feature_cutoff=feature_cutoff,
+        cutoff_quantile=cutoff_quantile,
+    )
+    timestamps = pd.to_datetime(raw_frame["InvoiceDate"], errors="coerce")
+    future_rows_excluded = int((timestamps > cutoff).sum())
+    prepared, provenance = prepare_retail_transactions(raw_frame, cutoff=cutoff)
     raw_rows = len(raw_frame)
     return ExternalDatasetBundle(
         "retail",
@@ -489,12 +538,21 @@ def fetch_retail() -> ExternalDatasetBundle:
             "retrieval_date": date.today().isoformat(),
             "raw_rows": raw_rows,
             "source_raw_rows": {"retail": raw_rows},
+            "feature_cutoff": cutoff.isoformat(),
+            "feature_cutoff_policy": cutoff_policy,
+            "future_rows_excluded": future_rows_excluded,
+            "temporal_leakage_control": "aggregate transactions at or before cutoff before linkage",
         },
     )
 
 
 def fetch_external_party(
-    name: str, *, insurance_sample_size: int | None = None, seed: int = 42
+    name: str,
+    *,
+    insurance_sample_size: int | None = None,
+    seed: int = 42,
+    retail_feature_cutoff: pd.Timestamp | str | None = None,
+    retail_cutoff_quantile: float = 0.70,
 ) -> ExternalDatasetBundle:
     if name == "bank":
         return fetch_bank()
@@ -503,7 +561,10 @@ def fetch_external_party(
     if name == "insurance":
         return fetch_insurance(sample_size=insurance_sample_size, seed=seed)
     if name == "retail":
-        return fetch_retail()
+        return fetch_retail(
+            feature_cutoff=retail_feature_cutoff,
+            cutoff_quantile=retail_cutoff_quantile,
+        )
     raise ValueError(f"unknown external party: {name}")
 
 
