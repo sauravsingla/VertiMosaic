@@ -4,15 +4,17 @@ from vertimosaic.reporting.feature_importance import (
     logistic_local_feature_importance,
     write_party_feature_importance,
 )
+from vertimosaic.reporting.guard import MissingMeasuredResultsError, write_final_report
 from vertimosaic.reporting.interpreter import (
     comparison_observation,
     interpret_calibration,
     interpret_costs,
     interpret_delta,
 )
-from vertimosaic.reporting.report import build_data_driven_report, write_final_report
+from vertimosaic.reporting.report import build_data_driven_report
 
 __all__ = [
+    "MissingMeasuredResultsError",
     "build_data_driven_report",
     "comparison_observation",
     "gbdt_local_feature_importance",
