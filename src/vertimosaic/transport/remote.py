@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import ssl
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -247,7 +248,8 @@ class _RelayHandler(BaseHTTPRequestHandler):
         if not isinstance(message_id, str) or not message_id:
             self.send_error(400, "missing message ID")
             return
-        if not isinstance(envelope.get("message_type"), str):
+        message_type = envelope.get("message_type")
+        if not isinstance(message_type, str):
             self.send_error(400, "missing message type")
             return
         if envelope.get("receiver_role") != server.receiver_role:
@@ -255,10 +257,22 @@ class _RelayHandler(BaseHTTPRequestHandler):
             return
         cached = server.idempotency_cache.get(message_id)
         if cached is None:
+            encoded_payload = envelope.get("payload")
+            if server.request_handler is not None:
+                try:
+                    result = server.request_handler(
+                        message_type,
+                        str(envelope.get("sender_role", "")),
+                        _decode_value(encoded_payload),
+                    )
+                    encoded_payload = _encode_value(result)
+                except (TypeError, ValueError, RuntimeError) as exc:
+                    self.send_error(422, str(exc))
+                    return
             cached = {
                 "schema_version": SCHEMA_VERSION,
                 "message_id": message_id,
-                "payload": envelope.get("payload"),
+                "payload": encoded_payload,
             }
             server.idempotency_cache[message_id] = cached
         response = json.dumps(cached, separators=(",", ":")).encode("utf-8")
@@ -283,12 +297,14 @@ class ReferenceRelayServer(ThreadingHTTPServer):
         bearer_token: str | None = None,
         path: str = "/v1/messages",
         max_body_bytes: int = 64 * 1024 * 1024,
+        request_handler: Callable[[str, str, Any], Any] | None = None,
     ) -> None:
         super().__init__(server_address, _RelayHandler)
         self.receiver_role = receiver_role
         self.bearer_token = bearer_token
         self.path = path
         self.max_body_bytes = max_body_bytes
+        self.request_handler = request_handler
         self.idempotency_cache: dict[str, dict[str, Any]] = {}
 
     def enable_mtls(
