@@ -65,13 +65,16 @@ def test_party_local_histogram_guards_fail_closed() -> None:
     with pytest.raises(ValueError, match="out of range"):
         party.route(np.arange(4), 3, 0.5)
 
-    assert party.candidate_histograms(
-        np.ones(4),
-        np.ones(4),
-        np.array([0]),
-        max_bins=2,
-        min_samples_leaf=1,
-    ) == []
+    assert (
+        party.candidate_histograms(
+            np.ones(4),
+            np.ones(4),
+            np.array([0]),
+            max_bins=2,
+            min_samples_leaf=1,
+        )
+        == []
+    )
     with pytest.raises(ValueError, match="out-of-range feature"):
         party.candidate_histograms(
             np.ones(4),
