@@ -9,7 +9,9 @@ from vertimosaic.privacy import run_privacy_audit
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run VertiMosaic empirical privacy leakage baselines")
+    parser = argparse.ArgumentParser(
+        description="Run VertiMosaic empirical privacy leakage baselines"
+    )
     parser.add_argument("--rows", type=int, default=1200)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output", type=Path, default=Path("reports/privacy_audit.json"))
