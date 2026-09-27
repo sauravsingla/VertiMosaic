@@ -116,6 +116,9 @@ def _complete_source_metadata(
         source_raw_rows = metadata.get("source_raw_rows", {})
         if not isinstance(source_raw_rows, dict):
             source_raw_rows = {}
+        source_checksums = metadata.get("source_checksums", {})
+        if not isinstance(source_checksums, dict):
+            source_checksums = {}
         source_licenses = metadata.get("source_licenses", {})
         if not isinstance(source_licenses, dict):
             source_licenses = {}
@@ -125,7 +128,10 @@ def _complete_source_metadata(
             record = dict(registry.describe(key))
             record["retrieval_date"] = metadata.get("retrieval_date")
             record["processed_rows"] = len(bundle.features)
-            record["checksum"] = None
+            checksum = source_checksums.get(key)
+            record["checksum"] = checksum if isinstance(checksum, str) and checksum.strip() else None
+            record["checksum_algorithm"] = metadata.get("source_checksum_algorithm")
+            record["checksum_scope"] = metadata.get("source_checksum_scope")
             if key in source_raw_rows:
                 record["raw_rows"] = source_raw_rows[key]
             elif len(keys) == 1:
@@ -139,6 +145,11 @@ def _complete_source_metadata(
                 license_value = record.get("license")
             if isinstance(license_value, str) and license_value.strip():
                 record["license"] = license_value.strip()
+            if record["checksum"] is None:
+                raise RuntimeError(
+                    f"source capture checksum is missing for {key}; "
+                    "external modelling is stopped conservatively"
+                )
             records.append(record)
         metadata["processed_rows"] = len(bundle.features)
         metadata["sources"] = records
