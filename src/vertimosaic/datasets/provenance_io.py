@@ -6,7 +6,8 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from vertimosaic.datasets.external import ExternalDatasetBundle, save_bundle as _save_bundle
+from vertimosaic.datasets.external import ExternalDatasetBundle
+from vertimosaic.datasets.external import save_bundle as _save_bundle
 from vertimosaic.datasets.registry import DatasetRegistry
 
 
