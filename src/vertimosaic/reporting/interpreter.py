@@ -52,18 +52,20 @@ def comparison_observation(comparison: dict[str, Any]) -> str:
             float(comparison["upper"]),
         )
     ]
-    secondary = {
-        "delta": comparison.get("paired_pr_auc_delta"),
-        "lower": comparison.get("paired_pr_auc_lower"),
-        "upper": comparison.get("paired_pr_auc_upper"),
-    }
-    if all(value is not None for value in secondary.values()):
+    secondary_delta = comparison.get("paired_pr_auc_delta")
+    secondary_lower = comparison.get("paired_pr_auc_lower")
+    secondary_upper = comparison.get("paired_pr_auc_upper")
+    if (
+        secondary_delta is not None
+        and secondary_lower is not None
+        and secondary_upper is not None
+    ):
         observations.append(
             interpret_delta(
                 "pr_auc",
-                float(secondary["delta"]),
-                float(secondary["lower"]),
-                float(secondary["upper"]),
+                float(secondary_delta),
+                float(secondary_lower),
+                float(secondary_upper),
             )
         )
     return " ".join(observations)
