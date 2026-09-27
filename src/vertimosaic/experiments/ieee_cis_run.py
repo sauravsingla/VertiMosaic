@@ -330,10 +330,7 @@ def run_ieee_cis_experiment(
     )
     feature_provenance = pd.DataFrame(
         [
-            *[
-                asdict(item)
-                for item in _feature_provenance("transaction", tx_feature_metadata)
-            ],
+            *[asdict(item) for item in _feature_provenance("transaction", tx_feature_metadata)],
             *[asdict(item) for item in _feature_provenance("identity", id_feature_metadata)],
         ]
     )
