@@ -17,9 +17,7 @@ def test_report_is_data_driven() -> None:
     report = build_data_driven_report(
         {
             "metrics": {"brier": 0.2, "ece": 0.05},
-            "comparisons": [
-                {"metric": "roc_auc", "delta": 0.01, "lower": -0.01, "upper": 0.03}
-            ],
+            "comparisons": [{"metric": "roc_auc", "delta": 0.01, "lower": -0.01, "upper": 0.03}],
             "estimated_communication_bytes": 1024,
         }
     )
