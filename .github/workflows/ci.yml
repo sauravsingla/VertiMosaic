@@ -20,7 +20,7 @@ jobs:
       - run: ruff format --check .
       - run: mypy src/vertimosaic
       - name: Full test suite with coverage report
-        run: pytest -q --cov=vertimosaic --cov-report=term-missing --cov-report=xml:coverage.xml
+        run: make coverage
       - name: Protocol-critical coverage gate (>=90%)
         run: make coverage-protocol
       - run: vertimosaic demo --rows 2000 --seed 42
@@ -40,6 +40,7 @@ jobs:
             paper/tables/
             runs/
             coverage.xml
+            coverage.json
           if-no-files-found: error
           retention-days: 30
       - run: python -m build
