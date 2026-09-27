@@ -67,9 +67,13 @@ def run_full_prompt_evidence(
     measured_sizes = benchmark["rows"].astype(int).tolist()
     if measured_sizes != _REQUIRED_SYNTHETIC_SIZES:
         raise RuntimeError(
-            f"full benchmark sizes differ from prompt: {measured_sizes} != {_REQUIRED_SYNTHETIC_SIZES}"
+            "full benchmark sizes differ from prompt: "
+            f"{measured_sizes} != {_REQUIRED_SYNTHETIC_SIZES}"
         )
-    if benchmark[["training_seconds", "inference_seconds", "peak_rss_bytes"]].isna().any().any():
+    required_resources = benchmark[
+        ["training_seconds", "inference_seconds", "peak_rss_bytes"]
+    ]
+    if required_resources.isna().any().any():
         raise RuntimeError("full benchmark contains missing required resource measurements")
 
     bundles = {
@@ -106,7 +110,9 @@ def run_full_prompt_evidence(
     distributed_run = _require_run_bundle(distributed)
 
     if observed.get("four_sources_same_real_people") is not False:
-        raise RuntimeError("external evidence must disclose that source rows are not the same people")
+        raise RuntimeError(
+            "external evidence must disclose that source rows are not the same people"
+        )
     observed_linkage = observed.get("linkage")
     if not isinstance(observed_linkage, dict) or not observed_linkage:
         raise RuntimeError("observed-target external evidence is missing linkage manifests")
@@ -116,12 +122,17 @@ def run_full_prompt_evidence(
     case_study = distributed.get("case_study")
     if not isinstance(case_study, dict):
         raise RuntimeError("distributed-signal external evidence did not produce a case study")
-    if case_study.get("qualifying_case") is not True or case_study.get("decision_changed") is not True:
+    if (
+        case_study.get("qualifying_case") is not True
+        or case_study.get("decision_changed") is not True
+    ):
         raise RuntimeError("case study did not satisfy the strict qualification rule")
     shift = float(case_study["absolute_probability_shift"])
     minimum_shift = float(case_study["minimum_probability_shift"])
     if shift < minimum_shift:
-        raise RuntimeError("case-study probability shift is below the declared materiality threshold")
+        raise RuntimeError(
+            "case-study probability shift is below the declared materiality threshold"
+        )
 
     preprocessor_paths = distributed.get("preprocessor_artifacts")
     if not isinstance(preprocessor_paths, dict):
