@@ -14,6 +14,11 @@ from ucimlrepo import fetch_ucirepo
 
 from vertimosaic.provenance import FeatureProvenance
 
+_SOURCE_HASH_ALGORITHM = "sha256"
+_SOURCE_HASH_SCOPE = "retrieved_dataframe_content_before_transformation"
+_INSURANCE_SOURCE_HASH_SCOPE = "retrieved_dataframe_before_sampling_or_transformation"
+_RETAIL_SOURCE_HASH_SCOPE = "retrieved_dataframe_before_cutoff_or_transformation"
+
 
 @dataclass(frozen=True)
 class ExternalDatasetBundle:
@@ -41,7 +46,9 @@ def _frame_sha256(frame: pd.DataFrame) -> str:
     digest = sha256()
     schema = [(str(column), str(dtype)) for column, dtype in frame.dtypes.items()]
     digest.update(json.dumps(schema, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
-    hashed = pd.util.hash_pandas_object(frame, index=True, categorize=True).to_numpy(dtype=np.uint64)
+    hashed = pd.util.hash_pandas_object(frame, index=True, categorize=True).to_numpy(
+        dtype=np.uint64
+    )
     digest.update(hashed.tobytes())
     return digest.hexdigest()
 
@@ -461,8 +468,8 @@ def fetch_bank() -> ExternalDatasetBundle:
             "raw_rows": raw_rows,
             "source_raw_rows": {"bank": raw_rows},
             "source_checksums": {"bank": _frame_sha256(source_frame)},
-            "source_checksum_algorithm": "sha256",
-            "source_checksum_scope": "retrieved_dataframe_content_before_transformation",
+            "source_checksum_algorithm": _SOURCE_HASH_ALGORITHM,
+            "source_checksum_scope": _SOURCE_HASH_SCOPE,
         },
     )
 
@@ -488,8 +495,8 @@ def fetch_telecom() -> ExternalDatasetBundle:
             "raw_rows": raw_rows,
             "source_raw_rows": {"telecom": raw_rows},
             "source_checksums": {"telecom": _frame_sha256(source_frame)},
-            "source_checksum_algorithm": "sha256",
-            "source_checksum_scope": "retrieved_dataframe_content_before_transformation",
+            "source_checksum_algorithm": _SOURCE_HASH_ALGORITHM,
+            "source_checksum_scope": _SOURCE_HASH_SCOPE,
         },
     )
 
@@ -531,8 +538,8 @@ def fetch_insurance(sample_size: int | None = None, seed: int = 42) -> ExternalD
             "raw_rows": source_raw_rows["insurance_freq"],
             "source_raw_rows": source_raw_rows,
             "source_checksums": source_checksums,
-            "source_checksum_algorithm": "sha256",
-            "source_checksum_scope": "retrieved_dataframe_content_before_sampling_or_transformation",
+            "source_checksum_algorithm": _SOURCE_HASH_ALGORITHM,
+            "source_checksum_scope": _INSURANCE_SOURCE_HASH_SCOPE,
         },
     )
 
@@ -590,8 +597,8 @@ def fetch_retail(
             "raw_rows": raw_rows,
             "source_raw_rows": {"retail": raw_rows},
             "source_checksums": {"retail": source_checksum},
-            "source_checksum_algorithm": "sha256",
-            "source_checksum_scope": "retrieved_dataframe_content_before_cutoff_or_transformation",
+            "source_checksum_algorithm": _SOURCE_HASH_ALGORITHM,
+            "source_checksum_scope": _RETAIL_SOURCE_HASH_SCOPE,
             "feature_cutoff": cutoff.isoformat(),
             "feature_cutoff_policy": cutoff_policy,
             "future_rows_excluded": future_rows_excluded,
