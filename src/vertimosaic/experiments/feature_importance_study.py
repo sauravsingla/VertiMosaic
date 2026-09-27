@@ -52,6 +52,16 @@ def run_feature_importance_study(
     gbdt.fit(train_active, train_passive)
     gbdt_frames = gbdt_local_feature_importance(gbdt, parties)
 
+    # A fresh evaluation partition represents the same organizations but is a distinct
+    # set of party objects. Copy train-derived routing state explicitly within each party;
+    # no coordinator-visible thresholds or hidden process-global registry are used.
+    for source_party, target_party in zip(
+        [train_active, *train_passive],
+        [test_active, *test_passive],
+        strict=True,
+    ):
+        source_party.share_histogram_routing_state_with(target_party)
+
     output: dict[str, pd.DataFrame] = {}
     directory.mkdir(parents=True, exist_ok=True)
     combined_results: list[pd.DataFrame] = []

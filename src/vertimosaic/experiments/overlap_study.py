@@ -114,6 +114,18 @@ def run_overlap_study(
             model = _model(model_name, seed)
             start = time.perf_counter()
             model.fit(train_active, train_passive)
+            if isinstance(model, VFLHistGBDT):
+                training_parties = [train_active, *train_passive]
+                for evaluation_parties in (
+                    [validation_active, *validation_passive],
+                    [test_active, *test_passive],
+                ):
+                    for source_party, target_party in zip(
+                        training_parties,
+                        evaluation_parties,
+                        strict=True,
+                    ):
+                        source_party.share_histogram_routing_state_with(target_party)
             training_seconds = time.perf_counter() - start
             validation_probability = model.predict_proba([validation_active, *validation_passive])[
                 :, 1

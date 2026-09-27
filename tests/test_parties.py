@@ -1,7 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
 import numpy as np
 import pytest
 
-from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.parties import ActiveParty, Coordinator, PassiveParty
 
 
 def test_party_validation_and_local_operations() -> None:
@@ -23,3 +24,14 @@ def test_active_party_rejects_bad_labels() -> None:
         ActiveParty("bank", x, np.array([0.0, 1.0]))
     with pytest.raises(ValueError):
         ActiveParty("bank", x, np.array([0.0, 2.0, 1.0]))
+
+
+def test_coordinator_validates_party_names_and_membership() -> None:
+    with pytest.raises(ValueError, match="at least one party"):
+        Coordinator(())
+    with pytest.raises(ValueError, match="must be unique"):
+        Coordinator(("bank", "bank"))
+
+    coordinator = Coordinator(("bank", "telecom"))
+    assert coordinator.has_party("bank")
+    assert not coordinator.has_party("retail")

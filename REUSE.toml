@@ -1,0 +1,10 @@
+version = 1
+SPDX-PackageName = "VertiMosaic"
+SPDX-PackageSupplier = "Person: Saurav Singla"
+SPDX-PackageDownloadLocation = "https://github.com/sauravsingla/VertiMosaic"
+
+[[annotations]]
+path = ["**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Saurav Singla"
+SPDX-License-Identifier = "Apache-2.0"

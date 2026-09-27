@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 import io
 import json
 import logging
@@ -43,4 +44,14 @@ def test_structured_log_rejects_nested_structures() -> None:
     logger = _logger(stream)
     with pytest.raises(UnsafeLogFieldError):
         log_event(logger, "unsafe", private_row={"feature": 1.0})
+    assert stream.getvalue() == ""
+
+
+def test_structured_log_rejects_empty_event_and_invalid_field_name() -> None:
+    stream = io.StringIO()
+    logger = _logger(stream)
+    with pytest.raises(UnsafeLogFieldError, match="event name"):
+        log_event(logger, "")
+    with pytest.raises(UnsafeLogFieldError, match="field names"):
+        log_event(logger, "unsafe", **{"": 1})
     assert stream.getvalue() == ""
