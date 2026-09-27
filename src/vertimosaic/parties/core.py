@@ -28,31 +28,51 @@ class OpaqueSplitReference:
 
 @dataclass(frozen=True)
 class HistogramRoutingState:
-    """Immutable party-local threshold state learned from training rows only."""
+    """Token-only handle to party-local histogram routing state.
 
-    _thresholds: tuple[np.ndarray, ...] = field(repr=False, compare=False)
+    This object is safe for the coordinating model to retain: it contains no threshold
+    arrays and no raw rows. Numeric thresholds live only in the private party store.
+    """
+
+    party_name: str
+    state_ref: str
+    n_features: int
     max_bins: int
 
     def __post_init__(self) -> None:
+        if not self.party_name or not self.state_ref:
+            raise ValueError("routing handle requires party and state identifiers")
+        if self.n_features < 0:
+            raise ValueError("routing handle feature width must be non-negative")
         if self.max_bins < 2:
             raise ValueError("max_bins must be at least 2")
+
+
+@dataclass(frozen=True)
+class _HistogramThresholdState:
+    """Private threshold arrays retained only in the owning party state store."""
+
+    thresholds: tuple[np.ndarray, ...] = field(repr=False, compare=False)
+    max_bins: int
+
+    def __post_init__(self) -> None:
         normalized: list[np.ndarray] = []
-        for values in self._thresholds:
+        for values in self.thresholds:
             array = np.asarray(values, dtype=float).reshape(-1).copy()
             array.setflags(write=False)
             normalized.append(array)
-        object.__setattr__(self, "_thresholds", tuple(normalized))
+        object.__setattr__(self, "thresholds", tuple(normalized))
 
     @property
     def n_features(self) -> int:
-        return len(self._thresholds)
+        return len(self.thresholds)
 
-    def _threshold_for(self, split_ref: OpaqueSplitReference) -> float:
+    def threshold_for(self, split_ref: OpaqueSplitReference) -> float:
         feature_ref = split_ref.feature_ref
         bin_ref = split_ref.bin_ref
-        if feature_ref < 0 or feature_ref >= len(self._thresholds):
+        if feature_ref < 0 or feature_ref >= len(self.thresholds):
             raise ValueError("split feature reference is out of range for routing state")
-        feature_thresholds = self._thresholds[feature_ref]
+        feature_thresholds = self.thresholds[feature_ref]
         if bin_ref < 0 or bin_ref >= len(feature_thresholds):
             raise ValueError("split bin reference is out of range for routing state")
         return float(feature_thresholds[bin_ref])
@@ -60,7 +80,7 @@ class HistogramRoutingState:
 
 # Simulation of party-owned model state. Only derived thresholds are stored here; raw
 # feature rows never enter this registry. The coordinating model sees only state_ref.
-_PARTY_HISTOGRAM_ROUTING_STATES: dict[str, dict[str, HistogramRoutingState]] = {}
+_PARTY_HISTOGRAM_ROUTING_STATES: dict[str, dict[str, _HistogramThresholdState]] = {}
 
 
 class HistogramCandidate(TypedDict):
@@ -85,7 +105,11 @@ class PassiveParty(Party):
         repr=False,
     )
     _histogram_max_bins: int | None = field(default=None, init=False, repr=False)
-    _histogram_state_ref: str | None = field(default=None, init=False, repr=False)
+    _histogram_routing_state: HistogramRoutingState | None = field(
+        default=None,
+        init=False,
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         x = np.asarray(self._x, dtype=float)
@@ -140,29 +164,49 @@ class PassiveParty(Party):
                 codes[~np.isfinite(values)] = len(feature_thresholds)
             binned[:, feature_idx] = codes
 
-        state = HistogramRoutingState(
+        state_ref = uuid4().hex
+        private_state = _HistogramThresholdState(
             tuple(thresholds[index] for index in range(self.n_features)),
             max_bins=max_bins,
         )
-        state_ref = uuid4().hex
-        _PARTY_HISTOGRAM_ROUTING_STATES.setdefault(self.name, {})[state_ref] = state
+        _PARTY_HISTOGRAM_ROUTING_STATES.setdefault(self.name, {})[state_ref] = private_state
 
         self._histogram_bins = binned
         self._histogram_thresholds = thresholds
         self._histogram_max_bins = max_bins
-        self._histogram_state_ref = state_ref
+        self._histogram_routing_state = HistogramRoutingState(
+            party_name=self.name,
+            state_ref=state_ref,
+            n_features=self.n_features,
+            max_bins=max_bins,
+        )
 
     def _ensure_histogram_bins(self, max_bins: int) -> None:
         if self._histogram_bins is None or self._histogram_max_bins != max_bins:
             self.prepare_histogram_bins(max_bins)
 
-    def _routing_state_for(self, split_ref: OpaqueSplitReference) -> HistogramRoutingState:
-        states = _PARTY_HISTOGRAM_ROUTING_STATES.get(self.name, {})
-        state = states.get(split_ref.state_ref)
-        if state is None:
-            raise ValueError("opaque split reference does not belong to this party")
-        if state.n_features != self.n_features:
+    def export_histogram_routing_state(self) -> HistogramRoutingState:
+        """Return only the opaque handle; numeric thresholds stay party-local."""
+        if self._histogram_routing_state is None:
+            raise RuntimeError("party-local histogram bins were not prepared")
+        return self._histogram_routing_state
+
+    def _private_routing_state(
+        self,
+        split_ref: OpaqueSplitReference,
+        handle: HistogramRoutingState,
+    ) -> _HistogramThresholdState:
+        if handle.party_name != self.name:
+            raise ValueError("routing handle belongs to a different party")
+        if handle.state_ref != split_ref.state_ref:
+            raise ValueError("split reference does not match the supplied routing handle")
+        if handle.n_features != self.n_features:
             raise ValueError("routing state feature width does not match this party")
+        state = _PARTY_HISTOGRAM_ROUTING_STATES.get(self.name, {}).get(handle.state_ref)
+        if state is None:
+            raise ValueError("opaque routing state is unavailable for this party")
+        if state.n_features != self.n_features or state.max_bins != handle.max_bins:
+            raise ValueError("private routing state metadata does not match the handle")
         return state
 
     def candidate_histograms(
@@ -179,7 +223,7 @@ class PassiveParty(Party):
         if len(indices) < 2 * min_samples_leaf:
             return out
         self._ensure_histogram_bins(max_bins)
-        if self._histogram_bins is None or self._histogram_state_ref is None:
+        if self._histogram_bins is None or self._histogram_routing_state is None:
             raise RuntimeError("party-local histogram bins were not prepared")
         if feature_indices is None:
             features = np.arange(self.n_features, dtype=int)
@@ -222,7 +266,7 @@ class PassiveParty(Party):
                 out.append(
                     {
                         "split_ref": OpaqueSplitReference(
-                            state_ref=self._histogram_state_ref,
+                            state_ref=self._histogram_routing_state.state_ref,
                             feature_ref=int(feature_idx),
                             bin_ref=int(threshold_idx),
                         ),
@@ -242,9 +286,13 @@ class PassiveParty(Party):
     ) -> dict[int, dict[str, float | int]]:
         """Aggregate split usage locally by opaque party feature reference."""
         gains_by_feature: dict[int, list[float]] = {}
+        states = _PARTY_HISTOGRAM_ROUTING_STATES.get(self.name, {})
         for split_ref, gain in records:
-            self._routing_state_for(split_ref)
+            if split_ref.state_ref not in states:
+                raise ValueError("split reference does not belong to this party")
             feature_ref = split_ref.feature_ref
+            if feature_ref < 0 or feature_ref >= self.n_features:
+                raise ValueError("split feature reference is out of range for this party")
             gains_by_feature.setdefault(feature_ref, []).append(float(gain))
         output: dict[int, dict[str, float | int]] = {}
         for feature_ref, gains in gains_by_feature.items():
@@ -269,10 +317,14 @@ class PassiveParty(Party):
         self,
         indices: np.ndarray,
         split_ref: OpaqueSplitReference,
+        routing_state: HistogramRoutingState | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Apply an opaque training split using only party-owned threshold state."""
-        state = self._routing_state_for(split_ref)
-        threshold = state._threshold_for(split_ref)
+        handle = routing_state or self._histogram_routing_state
+        if handle is None:
+            raise RuntimeError("party-local histogram routing handle is unavailable")
+        private_state = self._private_routing_state(split_ref, handle)
+        threshold = private_state.threshold_for(split_ref)
         return self._route_with_threshold(indices, split_ref.feature_ref, threshold)
 
     def route(
