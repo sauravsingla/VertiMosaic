@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.parties import ActiveParty, HistogramRoutingState, PassiveParty
 from vertimosaic.parties.core import HistogramCandidate, OpaqueSplitReference
 from vertimosaic.transport import InMemoryTransport, StructuredPayload
 
@@ -42,11 +42,11 @@ class VFLHistGBDT:
 
     Passive parties receive target-derived gradient/Hessian signals through the
     simulated transport, build histograms from retained local bins, and send only
-    aggregate split statistics plus opaque party-owned routing tokens/feature/bin
-    references back through ``Message`` objects. The active party sends node membership
-    and selected opaque references through the same transport; the split-owning party
-    resolves its private threshold state, performs routing locally, and returns only
-    aligned partition indices. Numeric thresholds never enter coordinator model state.
+    aggregate split statistics plus opaque feature/bin references back through
+    ``Message`` objects. The active party sends node membership and selected opaque
+    references through the same transport; the split-owning party resolves its private
+    threshold state, performs routing locally, and returns only aligned partition
+    indices. The model retains only token-only routing handles, never numeric thresholds.
 
     This in-process simulator is not cryptographically secure: gradients, Hessians,
     node membership, opaque references, and routing information can leak information.
@@ -73,6 +73,11 @@ class VFLHistGBDT:
     training_loss_history_: list[float] = field(default_factory=list, init=False)
     validation_loss_history_: list[float] = field(default_factory=list, init=False)
     best_iteration_: int | None = field(default=None, init=False)
+    _routing_states: dict[str, HistogramRoutingState] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+    )
 
     def _validate_hyperparameters(self) -> None:
         if self.n_estimators <= 0:
@@ -128,15 +133,13 @@ class VFLHistGBDT:
 
     @staticmethod
     def _candidate_payload(candidates: list[HistogramCandidate]) -> StructuredPayload:
-        # Per candidate: one 32-byte opaque state token, two integer refs,
-        # four gradient/Hessian sums and two counts. This is a simulated payload size.
-        numeric_scalars = len(candidates) * 8
-        estimated_bytes = len(candidates) * (32 + 8 * 8)
+        # Per candidate: 2 opaque integer refs + 4 gradient/Hessian sums + 2 counts.
+        scalar_count = len(candidates) * 8
         return StructuredPayload(
             value=candidates,
-            shape=(len(candidates), 9),
-            scalar_count=numeric_scalars,
-            estimated_bytes=estimated_bytes,
+            shape=(len(candidates), 8),
+            scalar_count=scalar_count,
+            estimated_bytes=scalar_count * 8,
         )
 
     @staticmethod
@@ -157,12 +160,11 @@ class VFLHistGBDT:
         split_ref: OpaqueSplitReference,
         indices: np.ndarray,
     ) -> StructuredPayload:
-        # 32-byte opaque state token + two integer refs + row indices.
         return StructuredPayload(
             value=(split_ref, indices),
             shape=(len(indices),),
             scalar_count=int(len(indices) + 2),
-            estimated_bytes=int(indices.nbytes + 48),
+            estimated_bytes=int(indices.nbytes + 16),
         )
 
     def _route_selected_split(
@@ -175,6 +177,10 @@ class VFLHistGBDT:
         stage: str,
         step: int,
     ) -> tuple[np.ndarray, np.ndarray]:
+        routing_state = self._routing_states.get(party.name)
+        if routing_state is None:
+            raise RuntimeError(f"missing party-local routing handle for {party.name}")
+
         route_indices = indices
         route_ref = split_ref
         if party.name != active_name:
@@ -190,9 +196,7 @@ class VFLHistGBDT:
             route_ref, route_indices = delivered
             route_indices = np.asarray(route_indices, dtype=int)
 
-        # The party resolves route_ref.state_ref against its own private registry.
-        # The coordinating model never receives the corresponding threshold object.
-        left_idx, right_idx = party.route_split(route_indices, route_ref)
+        left_idx, right_idx = party.route_split(route_indices, route_ref, routing_state)
         if party.name != active_name:
             delivered_routing = self.transport.send(
                 self._routing_payload(left_idx, right_idx),
@@ -396,6 +400,9 @@ class VFLHistGBDT:
         self.party_names_ = list(parties)
         for party in party_list:
             party.prepare_histogram_bins(self.max_bins)
+        self._routing_states = {
+            party.name: party.export_histogram_routing_state() for party in party_list
+        }
 
         y = active.labels
         prevalence = np.clip(y.mean(), 1e-6, 1.0 - 1e-6)
@@ -418,6 +425,8 @@ class VFLHistGBDT:
             validation_n = validation_active.n_rows
             if any(party.n_rows != validation_n for party in validation_mapping.values()):
                 raise ValueError("validation parties must align to the same row count")
+            for name, source_party in parties.items():
+                source_party.share_histogram_routing_state_with(validation_mapping[name])
             validation_raw = np.full(validation_n, self.base_score_, dtype=float)
             validation_labels = validation_active.labels
 
