@@ -1,9 +1,19 @@
-.PHONY: test coverage lint type format-check build security sbom demo benchmark
+# SPDX-License-Identifier: Apache-2.0
+.PHONY: test coverage coverage-protocol lint type format-check build security sbom demo benchmark
 
 test:
 	pytest -q
 coverage:
-	pytest -q --cov=vertimosaic --cov-report=term-missing
+	pytest -q --cov=vertimosaic --cov-report=term-missing --cov-report=xml:coverage.xml
+coverage-protocol:
+	pytest -q \
+		--cov=vertimosaic.models.vfl_logistic \
+		--cov=vertimosaic.models.vfl_hist_gbdt \
+		--cov=vertimosaic.parties.core \
+		--cov=vertimosaic.transport \
+		--cov-branch \
+		--cov-report=term-missing \
+		--cov-fail-under=90
 lint:
 	ruff check .
 type:
