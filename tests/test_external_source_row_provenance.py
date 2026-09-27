@@ -5,7 +5,7 @@ import pandas as pd
 from vertimosaic.datasets import external
 
 
-def test_external_loaders_record_measured_raw_source_rows(monkeypatch) -> None:
+def test_external_loaders_record_measured_raw_source_rows_and_checksums(monkeypatch) -> None:
     bank_features = pd.DataFrame({"LIMIT_BAL": [1, 2, 3], "AGE": [30, 31, 32]})
     bank_targets = pd.DataFrame({"target": [0, 1, 0]})
     telecom_features = pd.DataFrame({"Age": [20, 21, 22, 23]})
@@ -64,3 +64,20 @@ def test_external_loaders_record_measured_raw_source_rows(monkeypatch) -> None:
     assert insurance.metadata["raw_rows"] == 3
     assert retail.metadata["source_raw_rows"] == {"retail": 2}
     assert retail.metadata["raw_rows"] == 2
+
+    for bundle, keys in (
+        (bank, ("bank",)),
+        (telecom, ("telecom",)),
+        (insurance, ("insurance_freq", "insurance_sev")),
+        (retail, ("retail",)),
+    ):
+        checksums = bundle.metadata["source_checksums"]
+        assert isinstance(checksums, dict)
+        assert set(checksums) == set(keys)
+        assert all(len(str(checksums[key])) == 64 for key in keys)
+        assert bundle.metadata["source_checksum_algorithm"] == "sha256"
+
+    assert (
+        insurance.metadata["source_checksums"]["insurance_freq"]
+        != insurance.metadata["source_checksums"]["insurance_sev"]
+    )

@@ -30,9 +30,82 @@ _DEPENDENCIES = (
 )
 
 
+def _normalized_git_sha(value: str | None) -> str | None:
+    if value is None:
+        return None
+    candidate = value.strip().lower()
+    if len(candidate) not in {40, 64}:
+        return None
+    if any(character not in "0123456789abcdef" for character in candidate):
+        return None
+    return candidate
+
+
+def _git_directory(start: Path) -> Path | None:
+    for directory in (start, *start.parents):
+        marker = directory / ".git"
+        if marker.is_dir():
+            return marker
+        if marker.is_file():
+            try:
+                content = marker.read_text(encoding="utf-8").strip()
+            except OSError:
+                continue
+            if content.startswith("gitdir:"):
+                raw = content.partition(":")[2].strip()
+                git_dir = Path(raw)
+                if not git_dir.is_absolute():
+                    git_dir = (directory / git_dir).resolve()
+                if git_dir.is_dir():
+                    return git_dir
+    return None
+
+
+def _sha_from_git_directory(git_dir: Path) -> str | None:
+    try:
+        head = (git_dir / "HEAD").read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    direct = _normalized_git_sha(head)
+    if direct is not None:
+        return direct
+    if not head.startswith("ref:"):
+        return None
+    ref = head.partition(":")[2].strip()
+    try:
+        loose = (git_dir / ref).read_text(encoding="utf-8").strip()
+    except OSError:
+        loose = ""
+    resolved = _normalized_git_sha(loose)
+    if resolved is not None:
+        return resolved
+    try:
+        packed = (git_dir / "packed-refs").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for line in packed:
+        if not line or line.startswith(("#", "^")):
+            continue
+        value, separator, packed_ref = line.partition(" ")
+        if separator and packed_ref.strip() == ref:
+            return _normalized_git_sha(value)
+    return None
+
+
 def _git_sha() -> str | None:
-    """Return a trusted CI/user-provided Git SHA when available."""
-    return os.environ.get("GITHUB_SHA") or os.environ.get("VERTIMOSAIC_GIT_SHA")
+    """Return the current repository SHA without invoking a shell command."""
+    for environment_name in ("GITHUB_SHA", "VERTIMOSAIC_GIT_SHA"):
+        resolved = _normalized_git_sha(os.environ.get(environment_name))
+        if resolved is not None:
+            return resolved
+    for start in (Path.cwd(), Path(__file__).resolve().parent):
+        git_dir = _git_directory(start)
+        if git_dir is None:
+            continue
+        resolved = _sha_from_git_directory(git_dir)
+        if resolved is not None:
+            return resolved
+    return None
 
 
 def environment_snapshot(seed: int | None = None) -> dict[str, Any]:
@@ -85,7 +158,7 @@ class RunArtifacts:
     @classmethod
     def create(cls, root: Path = Path("runs"), run_id: str | None = None) -> RunArtifacts:
         if run_id is None:
-            timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+            timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
             run_id = f"run-{timestamp}-{os.getpid()}"
         obj = cls(root=root, run_id=run_id)
         obj.directory.mkdir(parents=True, exist_ok=False)
@@ -142,7 +215,7 @@ class RunArtifacts:
             "run_id": self.run_id,
             "created_at": datetime.now(UTC).isoformat(),
             "seed": seed,
-            "git_sha": _git_sha(),
+            "git_sha": environment["git_sha"],
             "configuration_hash": sha256(config_bytes).hexdigest(),
             "dataset_provenance_hash": _json_hash(dataset_provenance),
             "dataset_hashes": dataset_hashes if isinstance(dataset_hashes, dict) else {},

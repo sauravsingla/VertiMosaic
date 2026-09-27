@@ -53,11 +53,11 @@ def main(*, smoke: bool = False) -> None:
         benchmark_sizes,
         seed=42,
         model_name="logistic",
-        bootstrap_replicates=100,
+        bootstrap_replicates=bootstrap_replicates,
     )
 
     if not smoke:
-        run_distributed_signal_case_study(seed=42)
+        run_distributed_signal_case_study(seed=42, bootstrap_replicates=bootstrap_replicates)
 
     logistic_run = Path(str(logistic["run_directory"]))
     gbdt_run = Path(str(gbdt["run_directory"]))

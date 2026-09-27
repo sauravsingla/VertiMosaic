@@ -84,6 +84,51 @@ class LocalTabularPreprocessor:
     def fit_transform(self, frame: pd.DataFrame) -> np.ndarray:
         return self.fit(frame).transform(frame)
 
+    def output_feature_metadata(self) -> list[dict[str, str]]:
+        """Describe each transformed column without exposing any row-level values."""
+        if self.transformer_ is None:
+            raise RuntimeError("preprocessor is not fitted")
+        output_names = [str(name) for name in self.transformer_.get_feature_names_out()]
+        metadata: list[dict[str, str]] = []
+        cursor = 0
+        numeric_transform = "median imputation"
+        if self.scaling != "none":
+            numeric_transform += f" + {self.scaling} scaling"
+        if self.winsor_quantile is not None:
+            numeric_transform = f"winsorization + {numeric_transform}"
+        for source_column in self.numeric_columns:
+            metadata.append(
+                {
+                    "feature": output_names[cursor],
+                    "source_column": source_column,
+                    "transformation": numeric_transform,
+                }
+            )
+            cursor += 1
+        if self.categorical_columns:
+            categorical_pipeline = self.transformer_.named_transformers_["categorical"]
+            encoder = categorical_pipeline.named_steps["onehot"]
+            for source_column, categories in zip(
+                self.categorical_columns,
+                encoder.categories_,
+                strict=True,
+            ):
+                for _ in categories:
+                    metadata.append(
+                        {
+                            "feature": output_names[cursor],
+                            "source_column": source_column,
+                            "transformation": (
+                                "most-frequent imputation + one-hot encoding "
+                                "(unknown categories ignored)"
+                            ),
+                        }
+                    )
+                    cursor += 1
+        if cursor != len(output_names):
+            raise RuntimeError("preprocessor feature metadata does not match transformed columns")
+        return metadata
+
     def save(self, path: Path) -> None:
         if self.transformer_ is None:
             raise RuntimeError("preprocessor is not fitted")

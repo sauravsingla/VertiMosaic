@@ -123,8 +123,8 @@ def run_synthetic_experiment(
     rows: int = 2000,
     seed: int = 42,
     model_name: str = "logistic",
-    bootstrap_replicates: int = 100,
-    write_run: bool = False,
+    bootstrap_replicates: int = 1000,
+    write_run: bool = True,
     runs_root: Path = Path("runs"),
 ) -> dict[str, Any]:
     preparation_start = time.perf_counter()
@@ -198,6 +198,7 @@ def run_synthetic_experiment(
         "model": model_name,
         "rows": rows,
         "seed": seed,
+        "bootstrap_replicates": bootstrap_replicates,
         "threshold": threshold,
         "metrics": metrics,
         "confusion_matrix": confusion_at_threshold(test_active.labels, test_p, threshold),

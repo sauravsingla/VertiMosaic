@@ -85,6 +85,25 @@ def _benchmark_observation(frame: pd.DataFrame) -> str:
     )
 
 
+def _convergence_observation(frame: pd.DataFrame) -> str:
+    """Describe measured loss history without asserting mathematical convergence."""
+    for column in ("validation_loss", "loss", "training_loss"):
+        if column not in frame.columns:
+            continue
+        values = pd.to_numeric(frame[column], errors="coerce").dropna()
+        if values.empty:
+            continue
+        initial = float(values.iloc[0])
+        final = float(values.iloc[-1])
+        delta = final - initial
+        return (
+            f"Convergence trace ({column}): measured loss changed from {initial:.6f} "
+            f"to {final:.6f} across {len(values)} recorded steps (delta={delta:.6f}). "
+            "This is a descriptive training trace, not proof of mathematical convergence."
+        )
+    return "Training history was present but contained no numeric loss series to interpret."
+
+
 def build_data_driven_report(
     payload: dict[str, Any],
     *,
@@ -113,6 +132,14 @@ def build_data_driven_report(
         )
 
     artifact_status: dict[str, bool] = {}
+    run_directory_value = payload.get("run_directory")
+    training_history: pd.DataFrame | None = None
+    if isinstance(run_directory_value, str) and run_directory_value:
+        training_history = _read_csv(Path(run_directory_value) / "training_history.csv")
+    artifact_status["training_history"] = training_history is not None
+    if training_history is not None and not training_history.empty:
+        observations.append(_convergence_observation(training_history))
+
     overlap = _read_csv(results_directory / "partial_overlap.csv")
     artifact_status["partial_overlap"] = overlap is not None
     if overlap is not None and not overlap.empty:

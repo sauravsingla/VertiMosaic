@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+import time
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -8,6 +10,7 @@ import pandas as pd
 from vertimosaic.datasets import DatasetRegistry, ExternalDatasetBundle, fetch_external_party
 from vertimosaic.linkage import GaussianCopulaLinker, LinkageManifest
 from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.provenance import FeatureProvenance
 
 
 @dataclass(frozen=True)
@@ -17,6 +20,9 @@ class ExternalBenchmark:
     linkage_manifests: dict[str, LinkageManifest]
     mode: str
     feature_frames: dict[str, pd.DataFrame]
+    source_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
+    source_provenance: dict[str, list[FeatureProvenance]] = field(default_factory=dict)
+    entity_alignment_seconds: float = 0.0
 
 
 def _numeric_matrix(frame: pd.DataFrame) -> np.ndarray:
@@ -70,18 +76,87 @@ def _standardized_signal(values: np.ndarray) -> np.ndarray:
     return (signal - float(signal.mean())) / (std if std > 1e-12 else 1.0)
 
 
-def _verify_fetched_license_metadata(bundles: dict[str, ExternalDatasetBundle]) -> None:
-    """Require verifiable provider license metadata before external modelling."""
+def _verified_external_licenses(
+    bundles: dict[str, ExternalDatasetBundle],
+) -> dict[str, str]:
+    """Verify every source license and return runtime-only OpenML values."""
     registry = DatasetRegistry()
     for name in ("bank", "telecom", "retail"):
         if not registry.verify_license_metadata(name):
             raise RuntimeError(f"license metadata could not be verified for {name}")
-    insurance_license = bundles["insurance"].metadata.get("license")
-    if not isinstance(insurance_license, str) or not insurance_license.strip():
-        raise RuntimeError(
-            "OpenML insurance license metadata could not be verified; "
-            "external modelling is stopped conservatively"
-        )
+
+    insurance_bundle = bundles["insurance"]
+    supplied = insurance_bundle.metadata.get("source_licenses", {})
+    if not isinstance(supplied, dict):
+        supplied = {}
+    verified: dict[str, str] = {}
+    for key in registry.keys_for_party("insurance"):
+        value = supplied.get(key)
+        if not isinstance(value, str) or not value.strip():
+            value = registry.runtime_license(key)
+        if not isinstance(value, str) or not value.strip():
+            raise RuntimeError(
+                f"OpenML license metadata could not be verified for {key}; "
+                "external modelling is stopped conservatively"
+            )
+        verified[key] = value.strip()
+    return verified
+
+
+def _complete_source_metadata(
+    bundles: dict[str, ExternalDatasetBundle],
+    *,
+    insurance_licenses: dict[str, str],
+) -> dict[str, dict[str, Any]]:
+    """Combine runtime observations with the machine-readable source registry."""
+    registry = DatasetRegistry()
+    completed: dict[str, dict[str, Any]] = {}
+    for party, bundle in bundles.items():
+        metadata = dict(bundle.metadata)
+        source_raw_rows = metadata.get("source_raw_rows", {})
+        if not isinstance(source_raw_rows, dict):
+            source_raw_rows = {}
+        source_checksums = metadata.get("source_checksums", {})
+        if not isinstance(source_checksums, dict):
+            source_checksums = {}
+        source_licenses = metadata.get("source_licenses", {})
+        if not isinstance(source_licenses, dict):
+            source_licenses = {}
+        records: list[dict[str, Any]] = []
+        keys = registry.keys_for_party(party)
+        for key in keys:
+            record = dict(registry.describe(key))
+            record["retrieval_date"] = metadata.get("retrieval_date")
+            record["processed_rows"] = len(bundle.features)
+            checksum = source_checksums.get(key)
+            record["checksum"] = (
+                checksum if isinstance(checksum, str) and checksum.strip() else None
+            )
+            record["checksum_algorithm"] = metadata.get("source_checksum_algorithm")
+            record["checksum_scope"] = metadata.get("source_checksum_scope")
+            if key in source_raw_rows:
+                record["raw_rows"] = source_raw_rows[key]
+            elif len(keys) == 1:
+                record["raw_rows"] = metadata.get("raw_rows")
+            else:
+                record["raw_rows"] = None
+            license_value = source_licenses.get(key)
+            if party == "insurance":
+                license_value = insurance_licenses.get(key)
+            elif not isinstance(license_value, str) or not license_value.strip():
+                license_value = record.get("license")
+            if isinstance(license_value, str) and license_value.strip():
+                record["license"] = license_value.strip()
+            if record["checksum"] is None:
+                raise RuntimeError(
+                    f"source capture checksum is missing for {key}; "
+                    "external modelling is stopped conservatively"
+                )
+            records.append(record)
+        metadata["processed_rows"] = len(bundle.features)
+        metadata["sources"] = records
+        completed[party] = metadata
+    return completed
 
 
 def prepare_external_benchmark(
@@ -103,7 +178,11 @@ def prepare_external_benchmark(
             name: fetch_external_party(name, insurance_sample_size=insurance_sample_size, seed=seed)
             for name in ("bank", "telecom", "insurance", "retail")
         }
-        _verify_fetched_license_metadata(bundles)
+    insurance_licenses = _verified_external_licenses(bundles)
+    source_metadata = _complete_source_metadata(
+        bundles,
+        insurance_licenses=insurance_licenses,
+    )
     bank = bundles["bank"]
     bank_frame = bank.features.reset_index(drop=True)
     bank_matrix = _numeric_matrix(bank_frame)
@@ -116,6 +195,7 @@ def prepare_external_benchmark(
     linked_frames: dict[str, pd.DataFrame] = {}
     linked_matrices: dict[str, np.ndarray] = {}
     manifests: dict[str, LinkageManifest] = {}
+    alignment_start = time.perf_counter()
     for offset, name in enumerate(("telecom", "insurance", "retail"), start=1):
         linked_frames[name], linked_matrices[name], manifests[name] = _link_passive(
             bank_matrix,
@@ -123,6 +203,7 @@ def prepare_external_benchmark(
             correlation=cross_party_correlation,
             seed=seed + offset,
         )
+    entity_alignment_seconds = time.perf_counter() - alignment_start
 
     if mode == "observed_target_external":
         y = observed_target
@@ -160,6 +241,9 @@ def prepare_external_benchmark(
         linkage_manifests=manifests,
         mode=mode,
         feature_frames=feature_frames,
+        source_metadata=source_metadata,
+        source_provenance={name: list(bundle.provenance) for name, bundle in bundles.items()},
+        entity_alignment_seconds=entity_alignment_seconds,
     )
 
 

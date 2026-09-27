@@ -14,13 +14,6 @@ from vertimosaic.datasets.external import (
 )
 from vertimosaic.datasets.registry import DatasetRegistry
 
-_PARTY_REGISTRY_KEYS: dict[str, tuple[str, ...]] = {
-    "bank": ("bank",),
-    "telecom": ("telecom",),
-    "insurance": ("insurance_freq", "insurance_sev"),
-    "retail": ("retail",),
-}
-
 
 def _file_sha256(path: Path) -> str:
     digest = sha256()
@@ -34,29 +27,50 @@ def _source_records(bundle: ExternalDatasetBundle) -> list[dict[str, Any]]:
     registry = DatasetRegistry()
     retrieval_date = str(bundle.metadata.get("retrieval_date") or date.today().isoformat())
     runtime_license = bundle.metadata.get("license")
+    source_licenses = bundle.metadata.get("source_licenses", {})
+    if not isinstance(source_licenses, dict):
+        source_licenses = {}
     raw_rows = bundle.metadata.get("raw_rows")
     source_raw_rows = bundle.metadata.get("source_raw_rows", {})
     if not isinstance(source_raw_rows, dict):
         source_raw_rows = {}
-    keys = _PARTY_REGISTRY_KEYS.get(bundle.party, ())
+    source_checksums = bundle.metadata.get("source_checksums", {})
+    if not isinstance(source_checksums, dict):
+        source_checksums = {}
+    keys = registry.keys_for_party(bundle.party)
     records: list[dict[str, Any]] = []
     for key in keys:
         record = dict(registry.describe(key))
         record["retrieval_date"] = retrieval_date
         record["processed_rows"] = len(bundle.features)
-        # Provider APIs used by the loader do not expose a stable raw-file checksum.
-        # Keep the field explicit and null rather than fabricating one.
-        record["checksum"] = None
+        checksum = source_checksums.get(key)
+        record["checksum"] = checksum if isinstance(checksum, str) and checksum.strip() else None
+        record["checksum_algorithm"] = bundle.metadata.get("source_checksum_algorithm")
+        record["checksum_scope"] = bundle.metadata.get("source_checksum_scope")
         if key in source_raw_rows:
             record["raw_rows"] = source_raw_rows[key]
         elif len(keys) == 1:
             record["raw_rows"] = raw_rows
         else:
-            # A combined multi-source row count cannot safely be assigned to either
-            # underlying source, so preserve the unknown value explicitly.
             record["raw_rows"] = None
-        if isinstance(runtime_license, str) and runtime_license.strip():
-            record["license"] = runtime_license.strip()
+        source_license = source_licenses.get(key)
+        if not isinstance(source_license, str) or not source_license.strip():
+            if len(keys) == 1 and isinstance(runtime_license, str) and runtime_license.strip():
+                source_license = runtime_license
+            elif record.get("license") is None:
+                source_license = registry.runtime_license(key)
+        if isinstance(source_license, str) and source_license.strip():
+            record["license"] = source_license.strip()
+        if record.get("license") is None:
+            raise RuntimeError(
+                f"license metadata could not be verified for source {key}; "
+                "provenance persistence stopped conservatively"
+            )
+        if record["checksum"] is None:
+            raise RuntimeError(
+                f"source capture checksum is missing for {key}; "
+                "provenance persistence stopped conservatively"
+            )
         records.append(record)
     return records
 
@@ -93,8 +107,10 @@ def _combined_metadata(
 def save_bundle(bundle: ExternalDatasetBundle, directory: Path) -> dict[str, str]:
     """Persist a bundle and enrich its metadata with reproducible provenance.
 
-    The checksum covers the processed feature parquet produced by VertiMosaic. It
-    must not be interpreted as a checksum supplied by the original data provider.
+    Each source record carries a SHA-256 content hash of the retrieved source-frame
+    capture. The top-level checksum separately covers the processed feature parquet
+    produced by VertiMosaic; neither value is claimed to be a provider-published file
+    checksum unless the provider explicitly supplies one.
     """
     outputs = _save_bundle(bundle, directory)
     features_path = Path(outputs["features"])

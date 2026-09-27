@@ -10,6 +10,7 @@ from vertimosaic.experiments.external import ExternalBenchmark, prepare_external
 from vertimosaic.experiments.external_run import run_external_experiment
 from vertimosaic.experiments.feature_importance_study import run_feature_importance_study
 from vertimosaic.experiments.ieee_cis import IEEECISPrepared, prepare_ieee_cis
+from vertimosaic.experiments.ieee_cis_run import run_ieee_cis_experiment
 from vertimosaic.experiments.missing_parties import (
     MissingPartyPrepared,
     prepare_missing_party_method,
@@ -59,6 +60,7 @@ __all__ = [
     "run_dropout_study",
     "run_external_experiment",
     "run_feature_importance_study",
+    "run_ieee_cis_experiment",
     "run_missing_party_methods_study",
     "run_overlap_study",
     "run_synthetic_experiment",

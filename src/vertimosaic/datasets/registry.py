@@ -116,6 +116,10 @@ class DatasetRegistry:
         except KeyError as exc:
             raise KeyError(f"unknown dataset: {name}") from exc
 
+    def keys_for_party(self, party: str) -> tuple[str, ...]:
+        """Return stable registry keys for every source belonging to one VFL party."""
+        return tuple(key for key, record in REGISTRY.items() if record.party == party)
+
     def describe(self, name: str) -> dict[str, str | int | None]:
         return asdict(self.get(name))
 

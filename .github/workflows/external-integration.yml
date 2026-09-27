@@ -25,7 +25,7 @@ jobs:
             --output /tmp/vertimosaic-data \
             --insurance-sample-size 5000 \
             --seed 42
-      - name: Verify prepared external artifacts exist
+      - name: Verify prepared external artifacts and source provenance
         run: |
           test -s /tmp/vertimosaic-data/bank_features.parquet
           test -s /tmp/vertimosaic-data/telecom_features.parquet
@@ -40,3 +40,20 @@ jobs:
           test -s /tmp/vertimosaic-data/telecom_metadata.json
           test -s /tmp/vertimosaic-data/insurance_metadata.json
           test -s /tmp/vertimosaic-data/retail_metadata.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("/tmp/vertimosaic-data")
+          expected_sources = {"bank": 1, "telecom": 1, "insurance": 2, "retail": 1}
+          for party, expected_count in expected_sources.items():
+              payload = json.loads((root / f"{party}_metadata.json").read_text(encoding="utf-8"))
+              sources = payload.get("sources", [])
+              assert len(sources) == expected_count, (party, sources)
+              for source in sources:
+                  checksum = source.get("checksum")
+                  assert isinstance(checksum, str) and len(checksum) == 64, source
+                  assert source.get("raw_rows") is not None, source
+                  assert source.get("processed_rows") is not None, source
+                  assert source.get("license"), source
+          PY

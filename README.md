@@ -41,6 +41,8 @@ vertimosaic --help
 vertimosaic demo --rows 2000 --seed 42
 ```
 
+The quick-start demo is a smoke experiment and uses 100 bootstrap replicates. Normal research experiment and benchmark commands default to 1,000 bootstrap replicates. Experiment commands create a standard reproducibility bundle under `runs/<run_id>/`.
+
 Reference commands:
 
 ```bash
@@ -64,13 +66,25 @@ vertimosaic report
 vertimosaic external-demo --model vfl-hist-gbdt --seed 42
 ```
 
-Optional IEEE-CIS files are authorized local inputs only:
+Optional IEEE-CIS files are authorized local inputs only. VertiMosaic never downloads or redistributes these competition files and ordinary CI never depends on them. Preparation is available separately:
 
 ```bash
 vertimosaic prepare-ieee-cis \
   --transaction /path/to/train_transaction.csv \
   --identity /path/to/train_identity.csv
 ```
+
+To run the genuinely linked two-party benchmark on authorized local files:
+
+```bash
+vertimosaic run-ieee-cis \
+  --transaction /path/to/train_transaction.csv \
+  --identity /path/to/train_identity.csv \
+  --model logistic \
+  --seed 42
+```
+
+The IEEE-CIS mode uses the exact `TransactionID` intersection, keeps `isFraud` with the active transaction party, fits preprocessing independently on each party's training rows, evaluates on an entity-level held-out test set, pseudonymizes exported test identifiers, records source-file SHA-256 checksums, and writes the same reproducibility bundle as other experiments. It is a two-party linked sanity benchmark and must not be described as a four-industry benchmark.
 
 ## Reference algorithms
 
@@ -83,21 +97,21 @@ Centralized models exist only as **NON-FEDERATED BASELINES** for research compar
 - `observed_target_external`: Bank is the anchor population and uses the published observed default target; external profiles are linked target-blind.
 - `distributed_signal_external`: real transformed source-domain features are linked first, then a clearly disclosed semi-synthetic target depends on all four parties.
 - `synthetic_scale`: fully controlled scaling, overlap, dropout, drift, noise, and distributed-signal experiments.
-- `ieee_cis_linked`: optional genuinely linked local benchmark preparation when authorized IEEE-CIS transaction and identity files are supplied; restricted source files are never downloaded or redistributed by VertiMosaic.
+- `ieee_cis_linked`: optional genuinely linked two-party VFL benchmark using authorized local IEEE-CIS transaction and identity files joined by `TransactionID`; restricted source files are never downloaded, committed, or redistributed by VertiMosaic.
 
 ## External data and provenance
 
-The primary sources are UCI Default of Credit Card Clients (350), UCI Iranian Churn (563), OpenML `freMTPL2freq` (41214) / `freMTPL2sev` (41215), and UCI Online Retail (352). Retail is aggregated to customer level before VFL and uses temporal cutoffs to prevent future-data leakage. Source-code licensing does not relicense datasets; see `DATA_LICENSES.md`.
+The primary sources are UCI Default of Credit Card Clients (350), UCI Iranian Churn (563), OpenML `freMTPL2freq` (41214) / `freMTPL2sev` (41215), and UCI Online Retail (352). Retail is aggregated to customer level using an explicit source-time feature cutoff **before** cross-domain linkage, so post-cutoff transactions are excluded from the benchmark snapshot. Source-code licensing does not relicense datasets; see `DATA_LICENSES.md`.
 
-`vertimosaic datasets verify` checks the static UCI attribution fields and queries OpenML's official JSON metadata API for the two insurance licenses. Verification fails conservatively when required provider license metadata cannot be obtained. Downloaded artifact metadata retains the complete per-source provenance schema, and unknown raw-provider values remain explicit `null` values rather than being fabricated.
+`vertimosaic datasets verify` checks the static UCI attribution fields and queries OpenML's official JSON metadata API for the two insurance licenses. Verification fails conservatively when required provider license metadata cannot be obtained. Each retrieved source capture records a SHA-256 content checksum before transformation, sampling, or temporal cutoff as applicable, plus raw/processed row counts and per-source license metadata. Processed feature artifacts have a separately scoped SHA-256 checksum; source-capture hashes are not falsely presented as provider-published file checksums.
 
-Full experiment runs can record configuration, dataset/linkage provenance, environment, predictions, training history, communication metadata, and feature provenance under `runs/<run_id>/`.
+Every experiment run bundle records `config.yaml`, dataset/linkage provenance, environment and dependency versions, measured metrics, predictions, training history, communication metadata, feature provenance, artifact hashes, configuration hash, timestamps, seed, and Git SHA under `runs/<run_id>/`.
 
 ## Evaluation and scientific honesty
 
 Entity-level splits default to 70% train, 15% validation, and 15% test. Threshold selection uses validation data only. Test evaluation supports ROC-AUC, PR-AUC, precision, recall, F1, balanced accuracy, log loss, Brier score, ECE, confusion counts, deterministic bootstrap intervals, and paired bootstrap differences.
 
-No benchmark conclusion is hard-coded. Negative and uncertain findings are retained. Communication quantities are **simulated payload estimates**, not measured network traffic or latency. Result tables and reports should be generated from measured artifacts rather than manually typed metric values.
+Normal research runs use 1,000 deterministic bootstrap replicates where practical; smoke CI uses 100. No benchmark conclusion is hard-coded. Negative and uncertain findings are retained. Communication quantities are **simulated payload estimates**, not measured network traffic or latency. Result tables and reports should be generated from measured artifacts rather than manually typed metric values.
 
 ## Verification
 

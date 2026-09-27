@@ -16,6 +16,12 @@ from vertimosaic.experiments.robustness import (
     apply_numeric_drift,
     dropout_scenarios,
 )
+from vertimosaic.experiments.study_artifacts import (
+    model_communication_frame,
+    model_training_frame,
+    prediction_frame,
+    write_synthetic_study_run,
+)
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
 
@@ -45,6 +51,8 @@ def run_ablation_study(
     seed: int = 42,
     model_name: str = "logistic",
     output: Path = Path("results/party_ablation.csv"),
+    write_run: bool = True,
+    runs_root: Path = Path("runs"),
 ) -> pd.DataFrame:
     """Run all scientifically valid Bank-plus-passive party subsets under VFL training."""
     active, passive = make_vertical_synthetic(rows, seed)
@@ -54,6 +62,9 @@ def run_ablation_study(
     train_map = _passive_map(train_passive)
     test_map = _passive_map(test_passive)
     records: list[dict[str, Any]] = []
+    predictions: list[pd.DataFrame] = []
+    histories: list[pd.DataFrame] = []
+    communications: list[pd.DataFrame] = []
     for subset_size in range(len(_PASSIVE_NAMES) + 1):
         for subset in combinations(_PASSIVE_NAMES, subset_size):
             model = _model(model_name, seed)
@@ -64,10 +75,11 @@ def run_ablation_study(
             training_seconds = time.perf_counter() - start
             probability = model.predict_proba([test_active, *selected_test])[:, 1]
             metrics = binary_metrics(test_active.labels, probability)
+            condition = "+".join(("bank", *subset))
             records.append(
                 {
                     "model": model_name,
-                    "parties": "+".join(("bank", *subset)),
+                    "parties": condition,
                     "roc_auc": metrics["roc_auc"],
                     "pr_auc": metrics["pr_auc"],
                     "f1": metrics["f1"],
@@ -78,7 +90,33 @@ def run_ablation_study(
                     "estimated_communication_bytes": model.transport.estimated_payload_bytes,
                 }
             )
+            predictions.append(
+                prediction_frame(
+                    split.test,
+                    test_active.labels,
+                    probability,
+                    seed=seed,
+                    condition=condition,
+                )
+            )
+            histories.append(model_training_frame(model, condition=condition))
+            communications.append(model_communication_frame(model, condition=condition))
     frame = pd.DataFrame(records)
+    if write_run:
+        run_id, directory = write_synthetic_study_run(
+            study_name="party_ablation",
+            seed=seed,
+            active=active,
+            passive=passive,
+            config={"rows": rows, "model": model_name},
+            results=frame,
+            predictions=pd.concat(predictions, ignore_index=True),
+            training_history=pd.concat(histories, ignore_index=True),
+            communication=pd.concat(communications, ignore_index=True),
+            runs_root=runs_root,
+        )
+        frame["run_id"] = run_id
+        frame["run_directory"] = str(directory)
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output, index=False)
     return frame
@@ -91,12 +129,17 @@ def run_overlap_study(
     model_name: str = "logistic",
     fractions: tuple[float, ...] = (1.0, 0.9, 0.75, 0.5, 0.25),
     output: Path = Path("results/partial_overlap.csv"),
+    write_run: bool = True,
+    runs_root: Path = Path("runs"),
 ) -> pd.DataFrame:
     """Evaluate explicit intersection-only performance over controlled entity overlap."""
     active, passive = make_vertical_synthetic(rows, seed)
     rng = np.random.default_rng(seed)
     order = rng.permutation(rows)
     records: list[dict[str, Any]] = []
+    predictions: list[pd.DataFrame] = []
+    histories: list[pd.DataFrame] = []
+    communications: list[pd.DataFrame] = []
     for fraction in fractions:
         if not 0.0 < fraction <= 1.0:
             raise ValueError("overlap fractions must be in (0, 1]")
@@ -113,6 +156,7 @@ def run_overlap_study(
         training_seconds = time.perf_counter() - start
         probability = model.predict_proba([test_active, *test_passive])[:, 1]
         metrics = binary_metrics(test_active.labels, probability)
+        condition = f"overlap={fraction:.2f}"
         records.append(
             {
                 "overlap_fraction": fraction,
@@ -127,7 +171,33 @@ def run_overlap_study(
                 "estimated_communication_bytes": model.transport.estimated_payload_bytes,
             }
         )
+        predictions.append(
+            prediction_frame(
+                common[split.test],
+                test_active.labels,
+                probability,
+                seed=seed,
+                condition=condition,
+            )
+        )
+        histories.append(model_training_frame(model, condition=condition))
+        communications.append(model_communication_frame(model, condition=condition))
     frame = pd.DataFrame(records)
+    if write_run:
+        run_id, directory = write_synthetic_study_run(
+            study_name="partial_overlap",
+            seed=seed,
+            active=active,
+            passive=passive,
+            config={"rows": rows, "model": model_name, "fractions": list(fractions)},
+            results=frame,
+            predictions=pd.concat(predictions, ignore_index=True),
+            training_history=pd.concat(histories, ignore_index=True),
+            communication=pd.concat(communications, ignore_index=True),
+            runs_root=runs_root,
+        )
+        frame["run_id"] = run_id
+        frame["run_directory"] = str(directory)
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output, index=False)
     return frame
@@ -142,10 +212,10 @@ def _dropout_metrics_record(
     test_active: ActiveParty,
     test_parties: list[PassiveParty],
     training_seconds: float,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], np.ndarray]:
     probability = model.predict_proba([test_active, *test_parties])[:, 1]
     metrics = binary_metrics(test_active.labels, probability)
-    return {
+    record = {
         "phase": phase,
         "scenario": scenario,
         "dropped_parties": "+".join(dropped),
@@ -159,6 +229,7 @@ def _dropout_metrics_record(
         "training_seconds": training_seconds,
         "estimated_communication_bytes": model.transport.estimated_payload_bytes,
     }
+    return record, probability
 
 
 def run_dropout_study(
@@ -167,6 +238,8 @@ def run_dropout_study(
     seed: int = 42,
     max_iter: int = 350,
     output: Path = Path("results/party_dropout.csv"),
+    write_run: bool = True,
+    runs_root: Path = Path("runs"),
 ) -> pd.DataFrame:
     """Evaluate inference-time dropout and training-time party availability differences."""
     active, passive = make_vertical_synthetic(rows, seed)
@@ -187,18 +260,29 @@ def run_dropout_study(
     full_training_seconds = time.perf_counter() - full_start
 
     records: list[dict[str, Any]] = []
+    predictions: list[pd.DataFrame] = []
+    histories: list[pd.DataFrame] = []
+    communications: list[pd.DataFrame] = []
     for scenario, dropped in dropout_scenarios().items():
         available_names = [name for name in _PASSIVE_NAMES if name not in dropped]
         inference_parties = [test_map[name] for name in available_names]
-        records.append(
-            _dropout_metrics_record(
-                phase="inference_time_dropout",
-                scenario=scenario,
-                dropped=dropped,
-                model=full_model,
-                test_active=test_active,
-                test_parties=inference_parties,
-                training_seconds=full_training_seconds,
+        inference_record, inference_probability = _dropout_metrics_record(
+            phase="inference_time_dropout",
+            scenario=scenario,
+            dropped=dropped,
+            model=full_model,
+            test_active=test_active,
+            test_parties=inference_parties,
+            training_seconds=full_training_seconds,
+        )
+        records.append(inference_record)
+        predictions.append(
+            prediction_frame(
+                split.test,
+                test_active.labels,
+                inference_probability,
+                seed=seed,
+                condition=f"inference_time_dropout:{scenario}",
             )
         )
 
@@ -212,19 +296,52 @@ def run_dropout_study(
         training_start = time.perf_counter()
         availability_model.fit(train_active, available_train)
         training_seconds = time.perf_counter() - training_start
-        records.append(
-            _dropout_metrics_record(
-                phase="training_and_inference_availability",
-                scenario=scenario,
-                dropped=dropped,
-                model=availability_model,
-                test_active=test_active,
-                test_parties=inference_parties,
-                training_seconds=training_seconds,
+        availability_record, availability_probability = _dropout_metrics_record(
+            phase="training_and_inference_availability",
+            scenario=scenario,
+            dropped=dropped,
+            model=availability_model,
+            test_active=test_active,
+            test_parties=inference_parties,
+            training_seconds=training_seconds,
+        )
+        records.append(availability_record)
+        condition = f"training_and_inference_availability:{scenario}"
+        predictions.append(
+            prediction_frame(
+                split.test,
+                test_active.labels,
+                availability_probability,
+                seed=seed,
+                condition=condition,
             )
         )
+        histories.append(model_training_frame(availability_model, condition=condition))
+        communications.append(model_communication_frame(availability_model, condition=condition))
 
+    histories.append(model_training_frame(full_model, condition="full_training"))
+    communications.append(
+        model_communication_frame(
+            full_model,
+            condition="full_training_and_inference",
+        )
+    )
     frame = pd.DataFrame(records)
+    if write_run:
+        run_id, directory = write_synthetic_study_run(
+            study_name="party_dropout",
+            seed=seed,
+            active=active,
+            passive=passive,
+            config={"rows": rows, "max_iter": max_iter},
+            results=frame,
+            predictions=pd.concat(predictions, ignore_index=True),
+            training_history=pd.concat(histories, ignore_index=True),
+            communication=pd.concat(communications, ignore_index=True),
+            runs_root=runs_root,
+        )
+        frame["run_id"] = run_id
+        frame["run_directory"] = str(directory)
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output, index=False)
     return frame
@@ -264,6 +381,8 @@ def run_drift_study(
     rows: int = 1600,
     seed: int = 42,
     output: Path = Path("results/feature_drift.csv"),
+    write_run: bool = True,
+    runs_root: Path = Path("runs"),
 ) -> pd.DataFrame:
     """Evaluate mean, variance, missingness, and categorical-frequency shifts."""
     active, passive = make_vertical_synthetic(rows, seed)
@@ -298,6 +417,7 @@ def run_drift_study(
         },
     ]
     records: list[dict[str, Any]] = []
+    predictions: list[pd.DataFrame] = []
     for scenario in scenarios:
         party_name = scenario.get("party")
         active_eval = ActiveParty(
@@ -321,9 +441,10 @@ def run_drift_study(
             ]
         probability = model.predict_proba([active_eval, *passive_eval])[:, 1]
         metrics = binary_metrics(active_eval.labels, probability)
+        condition = str(scenario["scenario"])
         records.append(
             {
-                "scenario": scenario["scenario"],
+                "scenario": condition,
                 "party": party_name or "none",
                 "mean_shift": float(scenario.get("mean_shift", 0.0)),
                 "variance_scale": float(scenario.get("variance_scale", 1.0)),
@@ -338,7 +459,31 @@ def run_drift_study(
                 "ece": metrics["ece"],
             }
         )
+        predictions.append(
+            prediction_frame(
+                split.test,
+                active_eval.labels,
+                probability,
+                seed=seed,
+                condition=condition,
+            )
+        )
     frame = pd.DataFrame(records)
+    if write_run:
+        run_id, directory = write_synthetic_study_run(
+            study_name="feature_drift",
+            seed=seed,
+            active=active,
+            passive=passive,
+            config={"rows": rows, "scenarios": scenarios},
+            results=frame,
+            predictions=pd.concat(predictions, ignore_index=True),
+            training_history=model_training_frame(model, condition="baseline_training"),
+            communication=model_communication_frame(model, condition="baseline_training_and_eval"),
+            runs_root=runs_root,
+        )
+        frame["run_id"] = run_id
+        frame["run_directory"] = str(directory)
     output.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(output, index=False)
     return frame
