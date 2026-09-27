@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 import numpy as np
 import pandas as pd
 
-from vertimosaic.datasets import ExternalDatasetBundle, fetch_external_party
+from vertimosaic.datasets import DatasetRegistry, ExternalDatasetBundle, fetch_external_party
 from vertimosaic.linkage import GaussianCopulaLinker, LinkageManifest
 from vertimosaic.parties import ActiveParty, PassiveParty
 
@@ -70,6 +70,20 @@ def _standardized_signal(values: np.ndarray) -> np.ndarray:
     return (signal - float(signal.mean())) / (std if std > 1e-12 else 1.0)
 
 
+def _verify_fetched_license_metadata(bundles: dict[str, ExternalDatasetBundle]) -> None:
+    """Require verifiable provider license metadata before external modelling."""
+    registry = DatasetRegistry()
+    for name in ("bank", "telecom", "retail"):
+        if not registry.verify_license_metadata(name):
+            raise RuntimeError(f"license metadata could not be verified for {name}")
+    insurance_license = bundles["insurance"].metadata.get("license")
+    if not isinstance(insurance_license, str) or not insurance_license.strip():
+        raise RuntimeError(
+            "OpenML insurance license metadata could not be verified; "
+            "external modelling is stopped conservatively"
+        )
+
+
 def prepare_external_benchmark(
     *,
     mode: str = "observed_target_external",
@@ -89,6 +103,7 @@ def prepare_external_benchmark(
             name: fetch_external_party(name, insurance_sample_size=insurance_sample_size, seed=seed)
             for name in ("bank", "telecom", "insurance", "retail")
         }
+        _verify_fetched_license_metadata(bundles)
     bank = bundles["bank"]
     bank_frame = bank.features.reset_index(drop=True)
     bank_matrix = _numeric_matrix(bank_frame)
