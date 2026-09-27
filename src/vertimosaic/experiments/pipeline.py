@@ -46,9 +46,7 @@ def _array_sha256(values: np.ndarray) -> str:
     return digest.hexdigest()
 
 
-def _synthetic_dataset_hashes(
-    active: ActiveParty, passive: list[PassiveParty]
-) -> dict[str, str]:
+def _synthetic_dataset_hashes(active: ActiveParty, passive: list[PassiveParty]) -> dict[str, str]:
     hashes = {
         "bank_features": _array_sha256(active._x),
         "bank_labels": _array_sha256(active.labels),
