@@ -73,7 +73,13 @@ def paired_bootstrap_difference(
     replicates: int = 1000,
     seed: int = 42,
 ) -> dict[str, float | int | str]:
-    """Return a paired bootstrap interval for metric(A) minus metric(B)."""
+    """Return paired bootstrap intervals for an important held-out comparison.
+
+    When ROC-AUC is the primary metric, PR-AUC is evaluated on the exact same
+    paired bootstrap resamples and returned as secondary fields. This keeps the
+    imbalance-sensitive comparison coupled to the same sampling uncertainty
+    without doubling the bootstrap work.
+    """
     y = np.asarray(y_true).reshape(-1)
     a = np.asarray(probabilities_a, dtype=float).reshape(-1)
     b = np.asarray(probabilities_b, dtype=float).reshape(-1)
@@ -81,6 +87,7 @@ def paired_bootstrap_difference(
         raise ValueError("paired predictions must have equal length")
     rng = np.random.default_rng(seed)
     deltas: list[float] = []
+    paired_pr_auc_deltas: list[float] = []
     n = len(y)
     for _ in range(replicates):
         idx = rng.integers(0, n, size=n)
@@ -90,15 +97,32 @@ def paired_bootstrap_difference(
         score_a = _metric(metric, y_b, a[idx], threshold)
         score_b = _metric(metric, y_b, b[idx], threshold)
         deltas.append(score_a - score_b)
+        if metric == "roc_auc":
+            paired_pr_auc_deltas.append(
+                _metric("pr_auc", y_b, a[idx], threshold)
+                - _metric("pr_auc", y_b, b[idx], threshold)
+            )
     low, high = _interval(deltas)
     point = _metric(metric, y, a, threshold) - _metric(metric, y, b, threshold)
-    return {
+    result: dict[str, float | int | str] = {
         "metric": metric,
         "delta": float(point),
         "lower": low,
         "upper": high,
         "valid_replicates": len(deltas),
     }
+    if metric == "roc_auc":
+        pr_low, pr_high = _interval(paired_pr_auc_deltas)
+        result.update(
+            {
+                "paired_pr_auc_delta": _metric("pr_auc", y, a, threshold)
+                - _metric("pr_auc", y, b, threshold),
+                "paired_pr_auc_lower": pr_low,
+                "paired_pr_auc_upper": pr_high,
+                "paired_pr_auc_valid_replicates": len(paired_pr_auc_deltas),
+            }
+        )
+    return result
 
 
 def select_f1_threshold(
