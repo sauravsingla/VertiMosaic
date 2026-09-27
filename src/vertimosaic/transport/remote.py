@@ -169,7 +169,13 @@ class RemoteHTTPTransport(InMemoryTransport):
         for attempt in range(self.max_retries + 1):
             request = Request(endpoint, data=body, headers=headers, method="POST")
             try:
-                with urlopen(request, timeout=self.timeout_seconds, context=context) as response:
+                # Endpoint schemes are restricted above to HTTPS, or explicitly opted-in
+                # HTTP for loopback/local tests, so urllib cannot reach file/custom schemes.
+                with urlopen(  # nosec B310
+                    request,
+                    timeout=self.timeout_seconds,
+                    context=context,
+                ) as response:
                     response_body = response.read()
                     decoded = json.loads(response_body.decode("utf-8"))
                     if decoded.get("schema_version") != SCHEMA_VERSION:
