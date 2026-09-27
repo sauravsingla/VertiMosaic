@@ -20,18 +20,21 @@ def _read_csv(path: Path) -> pd.DataFrame | None:
 def _overlap_observations(frame: pd.DataFrame) -> list[str]:
     """Describe each measured overlap strategy independently."""
     observations: list[str] = []
+    grouped: list[tuple[str, pd.DataFrame]]
     if "method" in frame.columns:
-        groups = frame.groupby("method", sort=True)
+        grouped = [(str(method), group) for method, group in frame.groupby("method", sort=True)]
     else:
-        groups = [("intersection_only", frame)]
-    for method, group in groups:
+        grouped = [("intersection_only", frame)]
+    for method, group in grouped:
         ordered = group.sort_values("overlap_fraction")
         if ordered.empty:
             continue
         low = ordered.iloc[0]
         high = ordered.iloc[-1]
         delta = float(low["pr_auc"]) - float(high["pr_auc"])
-        coverage_name = "intersection_coverage" if "intersection_coverage" in ordered else "coverage"
+        coverage_name = (
+            "intersection_coverage" if "intersection_coverage" in ordered else "coverage"
+        )
         observations.append(
             f"Partial-overlap study ({method}): PR-AUC changed by {delta:.6f} between "
             f"overlap={float(high['overlap_fraction']):.2f} and "
