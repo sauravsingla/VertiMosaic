@@ -139,6 +139,11 @@ def run_synthetic_experiment(
     rss_before = process.memory_info().rss
     start = time.perf_counter()
     model.fit(train_active, train_passive, val_active, val_passive)
+    if isinstance(model, VFLHistGBDT):
+        training_parties: list[PassiveParty] = [train_active, *train_passive]
+        test_parties: list[PassiveParty] = [test_active, *test_passive]
+        for source_party, target_party in zip(training_parties, test_parties, strict=True):
+            source_party.share_histogram_routing_state_with(target_party)
     training_seconds = time.perf_counter() - start
     peak_rss_bytes = max(rss_before, process.memory_info().rss)
     val_p = model.predict_proba([val_active, *val_passive])[:, 1]
