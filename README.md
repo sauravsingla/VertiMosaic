@@ -31,7 +31,7 @@ The four primary public sources do **not** describe the same real people. The fo
 
 ## Privacy boundary
 
-The default simulator provides raw-feature locality, party-local computation/preprocessing, explicit protocol boundaries, metadata-only communication auditing, and research pseudonymization. It is **not cryptographically secure VFL** and does not automatically provide PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, malicious-party security, or formal differential privacy. Gradients, Hessians, local logits, residuals, entity membership, and routing information may leak information. See `docs/threat_model.md` and `docs/privacy_boundaries.md`.
+The default simulator provides raw-feature locality, party-local computation/preprocessing, explicit protocol boundaries, metadata-only communication auditing, and research pseudonymization. It is **not cryptographically secure VFL** and does not automatically provide PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, malicious-party security, or formal differential privacy. Gradients, Hessians, local logits, residuals, entity membership, routing information, and derived split statistics may leak information. See `docs/threat_model.md` and `docs/privacy_boundaries.md`.
 
 ## Quick start
 
@@ -45,6 +45,8 @@ Reference commands:
 
 ```bash
 vertimosaic datasets list
+vertimosaic datasets describe bank
+vertimosaic datasets verify
 vertimosaic datasets download bank
 vertimosaic datasets download-all
 vertimosaic prepare-external
@@ -81,11 +83,13 @@ Centralized models exist only as **NON-FEDERATED BASELINES** for research compar
 - `observed_target_external`: Bank is the anchor population and uses the published observed default target; external profiles are linked target-blind.
 - `distributed_signal_external`: real transformed source-domain features are linked first, then a clearly disclosed semi-synthetic target depends on all four parties.
 - `synthetic_scale`: fully controlled scaling, overlap, dropout, drift, noise, and distributed-signal experiments.
-- `ieee_cis_linked`: optional genuinely linked local benchmark when authorized IEEE-CIS transaction and identity files are supplied.
+- `ieee_cis_linked`: optional genuinely linked local benchmark preparation when authorized IEEE-CIS transaction and identity files are supplied; restricted source files are never downloaded or redistributed by VertiMosaic.
 
 ## External data and provenance
 
 The primary sources are UCI Default of Credit Card Clients (350), UCI Iranian Churn (563), OpenML `freMTPL2freq` (41214) / `freMTPL2sev` (41215), and UCI Online Retail (352). Retail is aggregated to customer level before VFL and uses temporal cutoffs to prevent future-data leakage. Source-code licensing does not relicense datasets; see `DATA_LICENSES.md`.
+
+`vertimosaic datasets verify` checks the static UCI attribution fields and queries OpenML's official JSON metadata API for the two insurance licenses. Verification fails conservatively when required provider license metadata cannot be obtained. Downloaded artifact metadata retains the complete per-source provenance schema, and unknown raw-provider values remain explicit `null` values rather than being fabricated.
 
 Full experiment runs can record configuration, dataset/linkage provenance, environment, predictions, training history, communication metadata, and feature provenance under `runs/<run_id>/`.
 
