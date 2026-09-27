@@ -227,11 +227,11 @@ def report(
     input_path: Path = Path("reports/experiment_payload.json"),
     output_directory: Path = Path("reports"),
 ) -> None:
-    payload = (
-        json.loads(input_path.read_text(encoding="utf-8"))
-        if input_path.exists()
-        else {"metrics": {}, "comparisons": []}
-    )
+    if not input_path.exists():
+        raise typer.BadParameter(
+            f"measured experiment payload does not exist: {input_path}; run an experiment first"
+        )
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
     md_path, json_path = write_final_report(payload, output_directory)
     typer.echo(json.dumps({"markdown": str(md_path), "json": str(json_path)}, indent=2))
 
