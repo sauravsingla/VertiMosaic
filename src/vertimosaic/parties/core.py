@@ -29,7 +29,7 @@ class HistogramRoutingState:
     """Token-only handle to party-local histogram routing state.
 
     This object is safe for the coordinating model to retain: it contains no threshold
-    arrays and no raw rows. Numeric thresholds live only in the private party store.
+    arrays and no raw rows. Numeric thresholds stay inside the owning party object.
     """
 
     party_name: str
@@ -48,7 +48,7 @@ class HistogramRoutingState:
 
 @dataclass(frozen=True)
 class _HistogramThresholdState:
-    """Private threshold arrays retained only in the owning party state store."""
+    """Immutable derived thresholds retained only by the owning party."""
 
     thresholds: tuple[np.ndarray, ...] = field(repr=False, compare=False)
     max_bins: int
@@ -76,11 +76,6 @@ class _HistogramThresholdState:
         return float(feature_thresholds[bin_ref])
 
 
-# Simulation of party-owned model state. Only derived thresholds are stored here; raw
-# feature rows never enter this registry. The coordinating model sees only token handles.
-_PARTY_HISTOGRAM_ROUTING_STATES: dict[str, dict[str, _HistogramThresholdState]] = {}
-
-
 class HistogramCandidate(TypedDict):
     """Protocol-visible aggregate statistics plus an opaque local split reference."""
 
@@ -104,6 +99,11 @@ class PassiveParty(Party):
     )
     _histogram_max_bins: int | None = field(default=None, init=False, repr=False)
     _histogram_routing_state: HistogramRoutingState | None = field(
+        default=None,
+        init=False,
+        repr=False,
+    )
+    _histogram_threshold_state: _HistogramThresholdState | None = field(
         default=None,
         init=False,
         repr=False,
@@ -162,19 +162,17 @@ class PassiveParty(Party):
                 codes[~np.isfinite(values)] = len(feature_thresholds)
             binned[:, feature_idx] = codes
 
-        state_ref = uuid4().hex
         private_state = _HistogramThresholdState(
             tuple(thresholds[index] for index in range(self.n_features)),
             max_bins=max_bins,
         )
-        _PARTY_HISTOGRAM_ROUTING_STATES.setdefault(self.name, {})[state_ref] = private_state
-
         self._histogram_bins = binned
         self._histogram_thresholds = thresholds
         self._histogram_max_bins = max_bins
+        self._histogram_threshold_state = private_state
         self._histogram_routing_state = HistogramRoutingState(
             party_name=self.name,
-            state_ref=state_ref,
+            state_ref=uuid4().hex,
             n_features=self.n_features,
             max_bins=max_bins,
         )
@@ -189,6 +187,21 @@ class PassiveParty(Party):
             raise RuntimeError("party-local histogram bins were not prepared")
         return self._histogram_routing_state
 
+    def share_histogram_routing_state_with(self, other: PassiveParty) -> None:
+        """Attach derived tree-routing state to another split owned by the same party.
+
+        This models train/validation/test partitions inside one organization. Only
+        derived threshold state is shared; raw feature rows remain in their own object.
+        """
+        if other.name != self.name:
+            raise ValueError("histogram routing state can only be shared within one party")
+        if other.n_features != self.n_features:
+            raise ValueError("histogram routing state requires matching feature width")
+        if self._histogram_routing_state is None or self._histogram_threshold_state is None:
+            raise RuntimeError("party-local histogram bins were not prepared")
+        other._histogram_routing_state = self._histogram_routing_state
+        other._histogram_threshold_state = self._histogram_threshold_state
+
     def _private_routing_state(
         self,
         handle: HistogramRoutingState,
@@ -197,9 +210,11 @@ class PassiveParty(Party):
             raise ValueError("routing handle belongs to a different party")
         if handle.n_features != self.n_features:
             raise ValueError("routing state feature width does not match this party")
-        state = _PARTY_HISTOGRAM_ROUTING_STATES.get(self.name, {}).get(handle.state_ref)
-        if state is None:
-            raise ValueError("opaque routing state is unavailable for this party")
+        if self._histogram_routing_state is None or self._histogram_threshold_state is None:
+            raise RuntimeError("party-local histogram threshold state is unavailable")
+        if handle.state_ref != self._histogram_routing_state.state_ref:
+            raise ValueError("routing handle does not match this party's local tree state")
+        state = self._histogram_threshold_state
         if state.n_features != self.n_features or state.max_bins != handle.max_bins:
             raise ValueError("private routing state metadata does not match the handle")
         return state
