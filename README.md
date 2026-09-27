@@ -223,16 +223,36 @@ Gradients, Hessians, local logits, residuals, entity membership, routing informa
 
 ## :card_file_box: External Data and Provenance
 
-The primary public sources are:
+VertiMosaic grounds its four-industry external benchmark in the following public datasets:
 
-- UCI **Default of Credit Card Clients** (350)
-- UCI **Iranian Churn** (563)
-- OpenML **`freMTPL2freq`** (41214) / **`freMTPL2sev`** (41215)
-- UCI **Online Retail** (352)
+| Industry / party | External dataset | Source ID | Role in VertiMosaic |
+|---|---|---:|---|
+| **Bank** | UCI **Default of Credit Card Clients** | UCI **350** | Financial/payment behaviour and the observed default target used by the active party |
+| **Telecom** | UCI **Iranian Churn** | UCI **563** | Telecom, customer-service, usage and churn-related features |
+| **Insurance** | OpenML **`freMTPL2freq`** + **`freMTPL2sev`** | **41214** + **41215** | Motor-insurance claim frequency, severity and risk-related features |
+| **Retail** | UCI **Online Retail** | UCI **352** | Transaction and purchase behaviour, aggregated to customer level |
 
-Retail is aggregated to customer level using an explicit source-time feature cutoff **before** cross-domain linkage, so post-cutoff transactions are excluded from the benchmark snapshot. Source-code licensing does not relicense datasets; see [`DATA_LICENSES.md`](DATA_LICENSES.md).
+Conceptually, the benchmark creates an aligned research profile across the four parties:
 
-`vertimosaic datasets verify` checks the static UCI attribution fields and queries OpenML's official JSON metadata API for the two insurance licenses. Verification fails conservatively when required provider license metadata cannot be obtained.
+```text
+Bank customer
+    ↕
+Telecom profile
+    ↕
+Insurance profile
+    ↕
+Retail profile
+```
+
+**Important:** these four public datasets do **not** describe the same real people. VertiMosaic preprocesses them independently and connects the four industry profiles only through an **explicitly semi-synthetic, target-blind linkage mechanism** for the cross-industry benchmark. The resulting linked profile is therefore a research construction, not a claim that the original Bank, Telecom, Insurance, and Retail records belong to the same real customers.
+
+The **Bank** dataset acts as the anchor population in `observed_target_external` mode and provides the published observed default target. In `distributed_signal_external` mode, transformed source-domain features are linked first and the semi-synthetic target is generated only after linked profiles are formed.
+
+The **Retail** source is aggregated to customer level using an explicit source-time feature cutoff before cross-domain linkage, so post-cutoff transactions are excluded from the benchmark snapshot.
+
+The optional **IEEE-CIS linked benchmark** is separate from the four-industry benchmark. It uses authorized local IEEE-CIS transaction and identity files joined through the exact `TransactionID` intersection and serves as a genuinely linked two-party sanity benchmark; VertiMosaic does not download or redistribute those competition files.
+
+Dataset licensing remains separate from the Apache-2.0 source-code license; see [`DATA_LICENSES.md`](DATA_LICENSES.md). `vertimosaic datasets verify` checks static UCI attribution fields and queries OpenML's official JSON metadata API for the two insurance licenses. Verification fails conservatively when required provider license metadata cannot be obtained.
 
 Each retrieved source capture records a SHA-256 content checksum before transformation, sampling, or temporal cutoff as applicable, plus raw/processed row counts and per-source license metadata. Processed feature artifacts have a separately scoped SHA-256 checksum; source-capture hashes are not presented as provider-published file checksums.
 
