@@ -64,9 +64,7 @@ def select_sanitized_case_study(
         "minimum_probability_shift": float(minimum_probability_shift),
         "decision_changed": True,
         "qualifying_case": True,
-        "selection_rule": (
-            "largest_bank_to_full_shift_among_material_threshold_crossings"
-        ),
+        "selection_rule": ("largest_bank_to_full_shift_among_material_threshold_crossings"),
         "contribution_summary": contributions,
         "contribution_method": "party_representation_permutation_probability_delta",
         "causal_importance": False,
