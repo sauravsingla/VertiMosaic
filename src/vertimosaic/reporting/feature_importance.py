@@ -94,7 +94,8 @@ def gbdt_local_feature_importance(
         party_map = {party.name: party for party in parties}
         missing = set(split_records) - set(party_map)
         if missing:
-            raise ValueError(f"missing split-owning parties for local importance: {sorted(missing)}")
+            message = f"missing split-owning parties for local importance: {sorted(missing)}"
+            raise ValueError(message)
         for party_name, records in split_records.items():
             aggregates = party_map[party_name].aggregate_local_split_importance(records)
             for feature_index, statistics in aggregates.items():
