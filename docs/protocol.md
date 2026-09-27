@@ -8,8 +8,21 @@ The reference implementation supports entity-aligned mini-batches, L1/L2 or elas
 
 ## Vertical histogram GBDT
 
-The active party maintains predictions and computes per-row gradients/Hessians. Before tree construction, each party fits and retains its own quantile-bin representation of its local training matrix. Node-level histogram candidates are then accumulated from those retained party-local bin codes using aggregate gradient/Hessian/count statistics rather than recomputing and exposing raw feature thresholds for every node.
+The active party maintains predictions and owns the labels. It computes per-row gradients and Hessians for binary logistic loss. The gradients and Hessians needed by each passive party are delivered through the simulated `Message`/`InMemoryTransport` boundary; the passive party therefore receives target-derived optimization signals, which is an explicit leakage surface rather than a cryptographic privacy guarantee.
 
-Passive candidate records expose aggregate statistics plus an opaque party-local feature/bin reference. The coordinator computes gains and selects the best party/reference; the owning party resolves the reference and performs routing locally. Numeric thresholds remain encapsulated in the in-process party-local split reference and are not coordinator-facing candidate fields. The implementation also supports party-local aggregation of GBDT split-count/gain feature importance so publication reports can receive aggregates without raw rows.
+Before tree construction, every party fits and retains a quantile-bin representation of its **training** matrix. Numeric bin thresholds are kept in immutable party-local routing state. Coordinator-visible `OpaqueSplitReference` objects contain only local `feature_ref` and `bin_ref` integers; they contain no threshold and no feature name. Validation and test rows are routed with the training-derived routing state, so evaluation data do not refit histogram thresholds.
 
-Gradient, Hessian, activation, entity-membership and routing messages can leak information. The default protocol is therefore a raw-feature-locality-preserving research simulator, not cryptographically secure VFL; it does not claim PSI, secure aggregation, MPC, homomorphic encryption, differential privacy, collusion resistance or malicious-party security.
+For each tree node, the active party sends the node-membership indices and any feature-subsample references needed by a passive party through `Message` objects. Each passive party then computes local candidate histograms from its retained bin codes. The real coordinator-facing candidate payload—not a placeholder—is returned through `Message`/`InMemoryTransport` and contains only:
+
+- opaque feature/bin reference;
+- left/right gradient sums;
+- left/right Hessian sums;
+- left/right counts.
+
+The active party calculates gains and chooses the best party/reference. For a passive-owned split, the selected opaque reference plus the aligned node membership are sent back through the transport. The owning party resolves the reference against its local training-derived routing state, applies the split locally, and returns only the partition-routing indices required to continue tree construction. Training, validation and inference routing use this same explicit message path for passive-owned splits.
+
+`AuditEvent` persists only communication metadata—message type, sender/receiver role, direction, stage/step, shape, scalar count and estimated bytes. Ephemeral payload values are not retained by the transport or audit log. Communication volume is therefore a **simulated payload-size estimate**, not observed network traffic.
+
+Feature-importance reporting can ask each owning party to aggregate its opaque split references into `split_count`, `gain_sum` and `gain_mean`; raw rows, numeric thresholds and feature names are not needed by the coordinator for that aggregation.
+
+Gradient, Hessian, activation, entity-membership and routing messages can leak information. The default protocol is therefore a raw-feature-locality-preserving research simulator, not cryptographically secure VFL. The in-process Python implementation provides protocol separation, not process isolation, and it does not claim PSI, secure aggregation, MPC, homomorphic encryption, formal differential privacy, collusion resistance or malicious-party security.
