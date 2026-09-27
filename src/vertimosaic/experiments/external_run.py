@@ -146,6 +146,9 @@ def _external_feature_provenance(
             source_feature = transformed["source_column"]
             original = source_lookup.get(source_feature)
             if original is None:
+                fallback_notes = (
+                    "passive-party row assignment is semi-synthetic" if party != "bank" else ""
+                )
                 records.append(
                     FeatureProvenance(
                         party=party,
@@ -156,13 +159,11 @@ def _external_feature_provenance(
                         source_type="real_external_derived",
                         observed_or_derived="derived",
                         semi_synthetic=party != "bank",
-                        notes="passive-party row assignment is semi-synthetic" if party != "bank" else "",
+                        notes=fallback_notes,
                     )
                 )
                 continue
-            linkage_note = (
-                "semi-synthetic donor linkage -> " if party != "bank" else ""
-            )
+            linkage_note = "semi-synthetic donor linkage -> " if party != "bank" else ""
             records.append(
                 FeatureProvenance(
                     party=party,
