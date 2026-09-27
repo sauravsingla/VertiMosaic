@@ -1,0 +1,42 @@
+name: External data integration
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "31 3 * * 6"
+
+jobs:
+  external-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - name: Inspect machine-readable dataset registry
+        run: vertimosaic datasets list
+      - name: Verify provider license metadata
+        run: vertimosaic datasets verify
+      - name: Download and preprocess all four public source domains
+        run: |
+          vertimosaic datasets download-all \
+            --output /tmp/vertimosaic-data \
+            --insurance-sample-size 5000 \
+            --seed 42
+      - name: Verify prepared external artifacts exist
+        run: |
+          test -s /tmp/vertimosaic-data/bank_features.parquet
+          test -s /tmp/vertimosaic-data/telecom_features.parquet
+          test -s /tmp/vertimosaic-data/insurance_features.parquet
+          test -s /tmp/vertimosaic-data/retail_features.parquet
+          test -s /tmp/vertimosaic-data/bank_target.parquet
+          test -s /tmp/vertimosaic-data/bank_feature_provenance.csv
+          test -s /tmp/vertimosaic-data/telecom_feature_provenance.csv
+          test -s /tmp/vertimosaic-data/insurance_feature_provenance.csv
+          test -s /tmp/vertimosaic-data/retail_feature_provenance.csv
+          test -s /tmp/vertimosaic-data/bank_metadata.json
+          test -s /tmp/vertimosaic-data/telecom_metadata.json
+          test -s /tmp/vertimosaic-data/insurance_metadata.json
+          test -s /tmp/vertimosaic-data/retail_metadata.json

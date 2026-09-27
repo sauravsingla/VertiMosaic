@@ -1,0 +1,11 @@
+benchmark_mode: synthetic_scale
+model: logistic
+seed: 42
+train_fraction: 0.70
+validation_fraction: 0.15
+test_fraction: 0.15
+cross_party_correlation: 0.25
+overlap_fraction: 1.0
+missing_party_method: intersection_only
+insurance_sample_size: null
+bootstrap_replicates: 1000
