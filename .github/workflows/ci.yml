@@ -28,7 +28,7 @@ jobs:
         if: matrix.python-version == '3.12'
         run: python scripts/reproduce_paper.py --smoke
       - name: Retain measured smoke and publication evidence
-        if: matrix.python-version == '3.12' && always()
+        if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4
         with:
           name: vertimosaic-smoke-evidence-py312
