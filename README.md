@@ -61,7 +61,8 @@ vertimosaic contribution
 vertimosaic overlap
 vertimosaic dropout
 vertimosaic drift
-vertimosaic benchmark
+vertimosaic benchmark --mode synthetic_scale --sizes 10000,30000,50000,100000,250000
+vertimosaic benchmark --mode observed_target_external --model vfl-hist-gbdt
 vertimosaic report
 vertimosaic external-demo --model vfl-hist-gbdt --seed 42
 ```
@@ -88,9 +89,11 @@ The IEEE-CIS mode uses the exact `TransactionID` intersection, keeps `isFraud` w
 
 ## Reference algorithms
 
-`VFLLogisticRegression` is the first-principles NumPy reference protocol. Each party computes local logits and local gradients over only its own features. `VFLHistGBDT` is a CPU vertical histogram-gradient-boosting research implementation in which parties compute local candidate statistics and the owning party performs routing.
+`VFLLogisticRegression` is the first-principles NumPy reference protocol. Each party computes local logits and local gradients over only its own features. `VFLHistGBDT` is a CPU vertical histogram-gradient-boosting research implementation in which every party fits and retains its own quantile-bin representation, computes aggregate gradient/Hessian/count candidate statistics from those local bins, and applies the chosen split locally through an opaque feature/bin reference. Numeric split thresholds and raw feature matrices are not carried in coordinator-facing candidate records.
 
-Centralized models exist only as **NON-FEDERATED BASELINES** for research comparison and are never relabelled as VFL.
+`LocalTabularPreprocessor` supports party-local median imputation, robust/standard scaling, categorical imputation, one-hot encoding with unknown-category handling, configurable winsorization, and a train-only local quantile-binning helper for tree-model preprocessing.
+
+Centralized models exist only as **NON-FEDERATED BASELINES** for research comparison and are never relabelled as VFL. The centralized baseline API explicitly supports every Bank-anchored party subset as well as Bank-only and all-party comparisons for logistic and histogram-gradient-boosting models.
 
 ## Benchmark modes
 
@@ -98,6 +101,12 @@ Centralized models exist only as **NON-FEDERATED BASELINES** for research compar
 - `distributed_signal_external`: real transformed source-domain features are linked first, then a clearly disclosed semi-synthetic target depends on all four parties.
 - `synthetic_scale`: fully controlled scaling, overlap, dropout, drift, noise, and distributed-signal experiments.
 - `ieee_cis_linked`: optional genuinely linked two-party VFL benchmark using authorized local IEEE-CIS transaction and identity files joined by `TransactionID`; restricted source files are never downloaded, committed, or redistributed by VertiMosaic.
+
+Synthetic CPU scaling uses the full 10K/30K/50K/100K/250K grid. External CPU benchmarking runs once at the **actual available Bank anchor size** and writes the same timing, memory, communication and metric fields into `benchmarks/results.csv`; it does not fabricate a synthetic external row count.
+
+## Partial entity overlap
+
+`vertimosaic overlap` evaluates 100%, 90%, 75%, 50% and 25% controlled Bank-to-passive overlap. The same deterministic availability realization and the same global train/validation/test entity split are used to compare `intersection_only` against missing-party-aware `availability_indicator` training. The output records both retained coverage and true common-intersection coverage, and selects F1 thresholds using validation predictions only.
 
 ## External data and provenance
 
@@ -111,7 +120,7 @@ Every experiment run bundle records `config.yaml`, dataset/linkage provenance, e
 
 Entity-level splits default to 70% train, 15% validation, and 15% test. Threshold selection uses validation data only. Test evaluation supports ROC-AUC, PR-AUC, precision, recall, F1, balanced accuracy, log loss, Brier score, ECE, confusion counts, deterministic bootstrap intervals, and paired bootstrap differences.
 
-Normal research runs use 1,000 deterministic bootstrap replicates where practical; smoke CI uses 100. No benchmark conclusion is hard-coded. Negative and uncertain findings are retained. Communication quantities are **simulated payload estimates**, not measured network traffic or latency. Result tables and reports should be generated from measured artifacts rather than manually typed metric values.
+Normal research runs use 1,000 deterministic bootstrap replicates where practical; smoke CI uses 100. Important ROC-AUC baseline comparisons also calculate the PR-AUC delta and 95% paired interval on the same paired bootstrap resamples. No benchmark conclusion is hard-coded. Negative and uncertain findings are retained. Communication quantities are **simulated payload estimates**, not measured network traffic or latency. Result tables and reports should be generated from measured artifacts rather than manually typed metric values.
 
 ## Verification
 
