@@ -2,7 +2,7 @@
 
 ## Logistic regression
 
-Each party computes a local logit contribution `X_p @ w_p`. The active party aggregates contributions, computes binary-logistic residuals from its target, and returns the residual signal required for each party to compute its local gradient. Raw feature matrices stay local.
+Each party computes a local logit contribution `X_p @ w_p`. Passive-party logit contributions are delivered to the active Bank through `Message`/`InMemoryTransport`; Bank aggregates them with its own local contribution and intercept, computes binary-logistic residuals from its target, and sends the residual signal back to each passive party through the same transport. Each party computes its gradient locally from the residual it actually received. Raw feature matrices stay local. Inference uses the same Message-mediated passive-logit path rather than bypassing the communication abstraction.
 
 The reference implementation supports entity-aligned mini-batches, L1/L2 or elastic-net regularization, class weighting, gradient clipping, deterministic shuffling, learning-rate schedules, warm start, validation monitoring and early stopping. Convergence telemetry is recorded as measured training/validation loss rather than inferred from final metrics.
 
