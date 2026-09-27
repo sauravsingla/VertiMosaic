@@ -64,9 +64,10 @@ class VFLLogisticRegression:
             raise ValueError("early_stopping_rounds must be positive when supplied")
         if isinstance(self.class_weight, str) and self.class_weight != "balanced":
             raise ValueError("class_weight string must be 'balanced'")
-        if isinstance(self.class_weight, dict):
-            if any(float(value) < 0.0 for value in self.class_weight.values()):
-                raise ValueError("class weights must be non-negative")
+        if isinstance(self.class_weight, dict) and any(
+            float(value) < 0.0 for value in self.class_weight.values()
+        ):
+            raise ValueError("class weights must be non-negative")
 
     def _sample_weights(self, y: np.ndarray) -> np.ndarray:
         n = len(y)
