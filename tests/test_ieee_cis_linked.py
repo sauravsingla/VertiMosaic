@@ -72,9 +72,7 @@ def test_ieee_cis_linked_runs_two_party_vfl_without_exporting_raw_ids(tmp_path: 
     raw_identifiers = {str(value) for value in transaction_ids}
     assert raw_identifiers.isdisjoint(set(predictions["entity_id"]))
 
-    provenance = json.loads(
-        (run_directory / "dataset_provenance.json").read_text(encoding="utf-8")
-    )
+    provenance = json.loads((run_directory / "dataset_provenance.json").read_text(encoding="utf-8"))
     assert provenance["authorization_required"] is True
     assert provenance["source_data_redistributed"] is False
     assert len(provenance["sources"]) == 2
