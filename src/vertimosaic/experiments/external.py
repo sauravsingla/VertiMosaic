@@ -109,7 +109,7 @@ def prepare_external_benchmark(
             name: fetch_external_party(name, insurance_sample_size=insurance_sample_size, seed=seed)
             for name in ("bank", "telecom", "insurance", "retail")
         }
-        _verify_fetched_license_metadata(bundles)
+    _verify_fetched_license_metadata(bundles)
     bank = bundles["bank"]
     bank_frame = bank.features.reset_index(drop=True)
     bank_matrix = _numeric_matrix(bank_frame)
