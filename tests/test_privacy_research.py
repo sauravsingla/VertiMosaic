@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 import numpy as np
 
-from vertimosaic import privacy
-from vertimosaic.datasets.synthetic import make_vertical_synthetic
+from vertimosaic.datasets import make_vertical_synthetic
 from vertimosaic.models import VFLLogisticRegression
+from vertimosaic.privacy import privacy_research_summary_rows, run_privacy_research
 
 
 _REQUIRED_EXPERIMENTS = {
@@ -17,7 +17,7 @@ _REQUIRED_EXPERIMENTS = {
 
 
 def test_privacy_research_smoke_covers_every_requested_axis_with_uncertainty() -> None:
-    result = privacy.run_privacy_research(smoke=True)
+    result = run_privacy_research(smoke=True)
     assert result["schema_version"] == 2
     assert result["formal_privacy_guarantee"] is False
     experiments = result["experiments"]
@@ -46,7 +46,7 @@ def test_privacy_research_smoke_covers_every_requested_axis_with_uncertainty() -
                 assert interval["n"] == 2
                 assert interval["ci95_low"] <= interval["mean"] <= interval["ci95_high"]
 
-    flattened = privacy.privacy_research_summary_rows(result)
+    flattened = privacy_research_summary_rows(result)
     assert flattened
     assert {row["experiment"] for row in flattened} == _REQUIRED_EXPERIMENTS
 
