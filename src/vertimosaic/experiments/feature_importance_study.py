@@ -7,6 +7,12 @@ import pandas as pd
 from vertimosaic.datasets import make_vertical_synthetic
 from vertimosaic.evaluation import entity_level_split
 from vertimosaic.experiments.pipeline import slice_parties
+from vertimosaic.experiments.study_artifacts import (
+    model_communication_frame,
+    model_training_frame,
+    prediction_frame,
+    write_synthetic_study_run,
+)
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.reporting import gbdt_local_feature_importance, logistic_local_feature_importance
 
@@ -18,11 +24,14 @@ def run_feature_importance_study(
     rows: int = 1200,
     seed: int = 42,
     directory: Path = Path("results"),
+    write_run: bool = True,
+    runs_root: Path = Path("runs"),
 ) -> dict[str, pd.DataFrame]:
     """Write measured party-local logistic and GBDT importance summaries."""
     active, passive = make_vertical_synthetic(rows, seed)
     split = entity_level_split(active.labels, seed=seed)
     train_active, train_passive = slice_parties(active, passive, split.train)
+    test_active, test_passive = slice_parties(active, passive, split.test)
     parties = [train_active, *train_passive]
 
     logistic = VFLLogisticRegression(
@@ -45,6 +54,7 @@ def run_feature_importance_study(
 
     output: dict[str, pd.DataFrame] = {}
     directory.mkdir(parents=True, exist_ok=True)
+    combined_results: list[pd.DataFrame] = []
     for party in _PARTIES:
         logistic_frame = logistic_frames[party].copy()
         logistic_frame.insert(0, "model", "logistic")
@@ -77,4 +87,59 @@ def run_feature_importance_study(
         path = directory / f"{party}_feature_importance.csv"
         combined.to_csv(path, index=False)
         output[party] = combined
+        combined_results.append(combined)
+
+    if write_run:
+        logistic_probability = logistic.predict_proba([test_active, *test_passive])[:, 1]
+        gbdt_probability = gbdt.predict_proba([test_active, *test_passive])[:, 1]
+        predictions = pd.concat(
+            [
+                prediction_frame(
+                    split.test,
+                    test_active.labels,
+                    logistic_probability,
+                    seed=seed,
+                    condition="logistic",
+                ),
+                prediction_frame(
+                    split.test,
+                    test_active.labels,
+                    gbdt_probability,
+                    seed=seed,
+                    condition="vfl-hist-gbdt",
+                ),
+            ],
+            ignore_index=True,
+        )
+        training_history = pd.concat(
+            [
+                model_training_frame(logistic, condition="logistic"),
+                model_training_frame(gbdt, condition="vfl-hist-gbdt"),
+            ],
+            ignore_index=True,
+        )
+        communication = pd.concat(
+            [
+                model_communication_frame(logistic, condition="logistic"),
+                model_communication_frame(gbdt, condition="vfl-hist-gbdt"),
+            ],
+            ignore_index=True,
+        )
+        results = pd.concat(combined_results, ignore_index=True, sort=False)
+        run_id, run_directory = write_synthetic_study_run(
+            study_name="local_feature_importance",
+            seed=seed,
+            active=active,
+            passive=passive,
+            config={"rows": rows, "models": ["logistic", "vfl-hist-gbdt"]},
+            results=results,
+            predictions=predictions,
+            training_history=training_history,
+            communication=communication,
+            runs_root=runs_root,
+        )
+        for party, frame in output.items():
+            frame["run_id"] = run_id
+            frame["run_directory"] = str(run_directory)
+            frame.to_csv(directory / f"{party}_feature_importance.csv", index=False)
     return output
