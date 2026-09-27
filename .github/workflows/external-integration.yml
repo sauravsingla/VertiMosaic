@@ -1,8 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
 name: External data integration
 on:
   workflow_dispatch:
   schedule:
     - cron: "31 3 * * 6"
+  pull_request:
+    paths:
+      - ".github/workflows/external-integration.yml"
+      - "src/vertimosaic/datasets/**"
+      - "src/vertimosaic/cli.py"
+      - "pyproject.toml"
 
 jobs:
   external-smoke:
@@ -42,10 +49,17 @@ jobs:
           test -s /tmp/vertimosaic-data/retail_metadata.json
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           root = Path("/tmp/vertimosaic-data")
           expected_sources = {"bank": 1, "telecom": 1, "insurance": 2, "retail": 1}
+          evidence = {
+              "repository": os.environ.get("GITHUB_REPOSITORY"),
+              "commit": os.environ.get("GITHUB_SHA"),
+              "run_id": os.environ.get("GITHUB_RUN_ID"),
+              "datasets": {},
+          }
           for party, expected_count in expected_sources.items():
               payload = json.loads((root / f"{party}_metadata.json").read_text(encoding="utf-8"))
               sources = payload.get("sources", [])
@@ -56,4 +70,25 @@ jobs:
                   assert source.get("raw_rows") is not None, source
                   assert source.get("processed_rows") is not None, source
                   assert source.get("license"), source
+              evidence["datasets"][party] = {
+                  "source_count": len(sources),
+                  "raw_rows": [source.get("raw_rows") for source in sources],
+                  "processed_rows": [source.get("processed_rows") for source in sources],
+                  "checksums": [source.get("checksum") for source in sources],
+                  "licenses": [source.get("license") for source in sources],
+              }
+          (root / "external_integration_evidence.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True),
+              encoding="utf-8",
+          )
           PY
+      - name: Retain external provenance evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vertimosaic-external-integration-evidence
+          path: |
+            /tmp/vertimosaic-data/*_metadata.json
+            /tmp/vertimosaic-data/*_feature_provenance.csv
+            /tmp/vertimosaic-data/external_integration_evidence.json
+          if-no-files-found: error
+          retention-days: 30
