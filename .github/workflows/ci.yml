@@ -30,6 +30,12 @@ jobs:
       - name: Empirical privacy audit smoke
         if: matrix.python-version == '3.12'
         run: python scripts/run_privacy_audit.py --rows 240 --seed 42 --output reports/privacy_audit.json
+      - name: Multi-factor privacy research smoke
+        if: matrix.python-version == '3.12'
+        run: >-
+          python scripts/run_privacy_research.py --smoke
+          --output reports/privacy_research.json
+          --csv reports/privacy_research_summary.csv
       - name: Retain measured smoke and publication evidence
         if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -1,4 +1,4 @@
-"""Explicit privacy guarantees, non-guarantees, and empirical leakage baselines."""
+"""Explicit privacy guarantees, non-guarantees, and empirical leakage research."""
 
 from vertimosaic.privacy.attacks import (
     MembershipInferenceResult,
@@ -9,6 +9,11 @@ from vertimosaic.privacy.attacks import (
     routing_membership_exposure,
 )
 from vertimosaic.privacy.experiments import run_privacy_audit
+from vertimosaic.privacy.research import (
+    PrivacyResearchConfig,
+    privacy_research_summary_rows,
+    run_privacy_research,
+)
 
 IMPLEMENTED_PROPERTIES = (
     "raw feature locality",
@@ -16,6 +21,7 @@ IMPLEMENTED_PROPERTIES = (
     "protocol separation",
     "pseudonymous research identifiers",
     "empirical leakage measurement baselines",
+    "multi-seed privacy/utility research sweeps",
 )
 
 NOT_GUARANTEED_PROPERTIES = (
@@ -30,10 +36,13 @@ __all__ = [
     "IMPLEMENTED_PROPERTIES",
     "NOT_GUARANTEED_PROPERTIES",
     "MembershipInferenceResult",
+    "PrivacyResearchConfig",
     "ResidualLabelInferenceResult",
     "RoutingExposureResult",
     "confidence_membership_inference",
+    "privacy_research_summary_rows",
     "residual_label_inference",
     "routing_membership_exposure",
     "run_privacy_audit",
+    "run_privacy_research",
 ]

@@ -41,6 +41,14 @@ def _encode_value(value: Any) -> Any:
             "feature_ref": int(value.feature_ref),
             "bin_ref": int(value.bin_ref),
         }
+    if value.__class__.__name__ == "HistogramRoutingState" and hasattr(value, "state_ref"):
+        return {
+            "__type__": "histogram_routing_state",
+            "party_name": str(value.party_name),
+            "state_ref": str(value.state_ref),
+            "n_features": int(value.n_features),
+            "max_bins": int(value.max_bins),
+        }
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     raise TypeError(f"remote transport cannot serialize {type(value).__name__}")
@@ -63,6 +71,15 @@ def _decode_value(value: Any) -> Any:
         return OpaqueSplitReference(
             feature_ref=int(value["feature_ref"]),
             bin_ref=int(value["bin_ref"]),
+        )
+    if marker == "histogram_routing_state":
+        from vertimosaic.parties.core import HistogramRoutingState
+
+        return HistogramRoutingState(
+            party_name=str(value["party_name"]),
+            state_ref=str(value["state_ref"]),
+            n_features=int(value["n_features"]),
+            max_bins=int(value["max_bins"]),
         )
     return {key: _decode_value(item) for key, item in value.items()}
 
