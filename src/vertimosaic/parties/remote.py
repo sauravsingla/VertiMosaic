@@ -130,7 +130,7 @@ class RemotePartyService:
             return party.export_histogram_routing_state()
         if message_type == _HIST_SIGNALS:
             request = self._mapping(payload, _HIST_SIGNALS)
-            signal_ref = str(request["signal_ref"])
+            registered_signal_ref = str(request["signal_ref"])
             gradients = np.asarray(request["gradients"], dtype=float).reshape(-1)
             hessians = np.asarray(request["hessians"], dtype=float).reshape(-1)
             if gradients.shape != hessians.shape or gradients.size != party.n_rows:
@@ -139,26 +139,26 @@ class RemotePartyService:
                 raise ValueError("gradient/Hessian signals must be finite")
             for key in [key for key in self._signal_cache if key[0] == partition]:
                 self._signal_cache.pop(key, None)
-            self._signal_cache[(partition, signal_ref)] = (
+            self._signal_cache[(partition, registered_signal_ref)] = (
                 gradients.copy(),
                 hessians.copy(),
             )
-            return {"signal_ref": signal_ref, "rows": int(gradients.size)}
+            return {"signal_ref": registered_signal_ref, "rows": int(gradients.size)}
         if message_type == _HIST_CLEAR_SIGNALS:
             request = self._mapping(payload, _HIST_CLEAR_SIGNALS)
-            signal_ref = request.get("signal_ref")
-            if signal_ref is None:
+            clear_signal_ref = request.get("signal_ref")
+            if clear_signal_ref is None:
                 keys = [key for key in self._signal_cache if key[0] == partition]
                 for key in keys:
                     self._signal_cache.pop(key, None)
             else:
-                self._signal_cache.pop((partition, str(signal_ref)), None)
+                self._signal_cache.pop((partition, str(clear_signal_ref)), None)
             return None
         if message_type == _HIST_CANDIDATES:
             request = self._mapping(payload, _HIST_CANDIDATES)
-            signal_ref = request.get("signal_ref")
-            if signal_ref is not None:
-                cached = self._signal_cache.get((partition, str(signal_ref)))
+            candidate_signal_ref = request.get("signal_ref")
+            if candidate_signal_ref is not None:
+                cached = self._signal_cache.get((partition, str(candidate_signal_ref)))
                 if cached is None:
                     raise ValueError("unknown or expired gradient/Hessian signal reference")
                 gradients, hessians = cached
