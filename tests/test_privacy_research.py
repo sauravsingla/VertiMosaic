@@ -5,7 +5,6 @@ from vertimosaic.datasets import make_vertical_synthetic
 from vertimosaic.models import VFLLogisticRegression
 from vertimosaic.privacy import privacy_research_summary_rows, run_privacy_research
 
-
 _REQUIRED_EXPERIMENTS = {
     "attack_vs_dataset_size",
     "attack_vs_party_count",
