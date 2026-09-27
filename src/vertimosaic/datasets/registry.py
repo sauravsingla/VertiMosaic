@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass
 from datetime import date
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
 @dataclass(frozen=True)
@@ -84,6 +87,25 @@ REGISTRY: dict[str, DatasetRecord] = {
 }
 
 
+def _openml_license_from_api(dataset_id: str, *, timeout_seconds: float = 10.0) -> str | None:
+    """Read license metadata from OpenML's official JSON API without downloading data."""
+    if not dataset_id.isdigit():
+        return None
+    url = f"https://www.openml.org/api/v1/json/data/{dataset_id}"
+    request = Request(url, headers={"Accept": "application/json", "User-Agent": "VertiMosaic/0.1"})
+    try:
+        # The URL is restricted above to a fixed HTTPS OpenML host and numeric dataset id.
+        with urlopen(request, timeout=timeout_seconds) as response:  # nosec B310
+            payload = json.load(response)
+    except (HTTPError, URLError, OSError, ValueError, json.JSONDecodeError):
+        return None
+    description = payload.get("data_set_description")
+    if not isinstance(description, dict):
+        return None
+    value = description.get("licence") or description.get("license")
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
 class DatasetRegistry:
     def list(self) -> list[dict[str, str | int | None]]:
         return [asdict(record) for record in REGISTRY.values()]
@@ -102,8 +124,18 @@ class DatasetRegistry:
         data["retrieval_date"] = date.today().isoformat()
         return data
 
+    def runtime_license(self, name: str) -> str | None:
+        """Return a verified provider license, querying OpenML when it is runtime-only."""
+        record = self.get(name)
+        if record.license is not None:
+            return record.license
+        if record.provider == "OpenML":
+            return _openml_license_from_api(record.dataset_id)
+        return None
+
     def verify_license_metadata(self, name: str) -> bool:
         record = self.get(name)
+        license_value = self.runtime_license(name)
         if record.provider == "OpenML":
-            return record.license is not None
-        return record.license is not None and record.license_url is not None
+            return license_value is not None
+        return license_value is not None and record.license_url is not None
