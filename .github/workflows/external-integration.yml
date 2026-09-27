@@ -17,6 +17,8 @@ jobs:
       - run: pip install -e ".[dev]"
       - name: Inspect machine-readable dataset registry
         run: vertimosaic datasets list
+      - name: Verify provider license metadata
+        run: vertimosaic datasets verify
       - name: Download and preprocess all four public source domains
         run: |
           vertimosaic datasets download-all \
@@ -34,3 +36,7 @@ jobs:
           test -s /tmp/vertimosaic-data/telecom_feature_provenance.csv
           test -s /tmp/vertimosaic-data/insurance_feature_provenance.csv
           test -s /tmp/vertimosaic-data/retail_feature_provenance.csv
+          test -s /tmp/vertimosaic-data/bank_metadata.json
+          test -s /tmp/vertimosaic-data/telecom_metadata.json
+          test -s /tmp/vertimosaic-data/insurance_metadata.json
+          test -s /tmp/vertimosaic-data/retail_metadata.json
