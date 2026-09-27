@@ -30,6 +30,11 @@ jobs:
         run: python scripts/reproduce_paper.py --smoke
       - name: Run empirical privacy audit
         run: python scripts/run_privacy_audit.py --rows 1200 --seed 42 --output reports/privacy_audit.json
+      - name: Run full multi-seed privacy research
+        run: >-
+          python scripts/run_privacy_research.py
+          --output reports/privacy_research.json
+          --csv reports/privacy_research_summary.csv
       - name: Record exact installed environment
         run: |
           mkdir -p release-evidence
