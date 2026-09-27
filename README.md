@@ -20,6 +20,25 @@ VertiMosaic is an open-source research framework for **vertical federated learni
 
 The framework emphasizes **scientific reproducibility, explicit privacy boundaries, source provenance, communication auditing, and efficient reference implementations**. It deliberately distinguishes raw-feature locality and pseudonymization from stronger cryptographic privacy guarantees.
 
+### First-screen protocol facts
+
+| Property | VertiMosaic |
+|---|---|
+| Federation type | **TRUE Vertical Federated Learning** |
+| Bank role | Financial/payment features + target |
+| Telecom role | Communications/service features |
+| Insurance role | Claims/risk features |
+| Retail role | Purchase features |
+| Raw party feature tables pooled during VFL | **NO** |
+| CPU supported | **YES** |
+| GPU required | **NO** |
+| Graph ML required | **NO** |
+| External real-world datasets | **YES** |
+| Four public sources describe the same real individuals | **NO** |
+| Cross-industry linkage | **SEMI-SYNTHETIC AND EXPLICITLY DOCUMENTED** |
+
+Horizontal FL generally uses different entities with a similar feature schema. Vertical FL aligns the same or overlapping entities while parties own different feature sets. **VertiMosaic implements the latter.**
+
 ### Highlights
 
 - **True vertical partitioning:** Bank is the active party and owns the binary target; Telecom, Insurance, and Retail contribute complementary feature columns through party-local computations.
