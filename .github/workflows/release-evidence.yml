@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Release evidence
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Install exact reproduction environment
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r reproducibility/requirements-py312.lock
+          pip install -e . --no-deps
+      - name: Run reproducible CPU evidence pipeline
+        run: python scripts/reproduce_paper.py --smoke
+      - name: Run empirical privacy audit
+        run: python scripts/run_privacy_audit.py --rows 1200 --seed 42 --output reports/privacy_audit.json
+      - name: Record exact installed environment
+        run: |
+          mkdir -p release-evidence
+          python -m pip freeze --all | LC_ALL=C sort > release-evidence/pip-freeze.txt
+          python -VV > release-evidence/python.txt
+      - name: Build hashed evidence manifest
+        run: python scripts/build_release_evidence.py
+      - name: Package immutable release evidence
+        run: |
+          tar -czf vertimosaic-release-evidence.tar.gz \
+            release-evidence \
+            results reports benchmarks paper/figures paper/tables runs \
+            reproducibility/requirements-py312.lock 2>/dev/null || \
+          tar -czf vertimosaic-release-evidence.tar.gz \
+            release-evidence reproducibility/requirements-py312.lock
+          sha256sum vertimosaic-release-evidence.tar.gz > vertimosaic-release-evidence.tar.gz.sha256
+      - name: Publish GitHub Release assets for tag
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
+          gh release upload "$TAG" \
+            vertimosaic-release-evidence.tar.gz \
+            vertimosaic-release-evidence.tar.gz.sha256 \
+            release-evidence/manifest.json \
+            release-evidence/pip-freeze.txt \
+            --clobber
