@@ -7,7 +7,7 @@ sdk: static
 app_file: index.html
 pinned: false
 license: apache-2.0
-short_description: Interactive VFL benchmark explorer for overlap, dropout, drift, contribution and communication
+short_description: Interactive VFL benchmark and robustness explorer
 ---
 
 # VertiMosaic — Vertical Federated Learning Research Explorer
