@@ -182,6 +182,31 @@ class PassiveParty(Party):
                 )
         return out
 
+    def aggregate_local_split_importance(
+        self,
+        records: list[tuple[OpaqueSplitReference, float]],
+    ) -> dict[int, dict[str, float | int]]:
+        """Aggregate split usage locally by party feature reference.
+
+        The caller supplies only opaque references previously issued by this party and
+        scalar gains. Raw rows, numeric thresholds, and feature names never leave the party.
+        """
+        gains_by_feature: dict[int, list[float]] = {}
+        for split_ref, gain in records:
+            feature_ref = split_ref.feature_ref
+            if feature_ref < 0 or feature_ref >= self.n_features:
+                raise ValueError("split feature reference is out of range for this party")
+            gains_by_feature.setdefault(feature_ref, []).append(float(gain))
+        output: dict[int, dict[str, float | int]] = {}
+        for feature_ref, gains in gains_by_feature.items():
+            gain_sum = float(np.sum(gains))
+            output[feature_ref] = {
+                "split_count": len(gains),
+                "gain_sum": gain_sum,
+                "gain_mean": gain_sum / len(gains),
+            }
+        return output
+
     def _route_with_threshold(
         self, indices: np.ndarray, feature_idx: int, threshold: float
     ) -> tuple[np.ndarray, np.ndarray]:
