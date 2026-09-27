@@ -94,13 +94,11 @@ def generate_publication_artifacts(
     benchmarks = pd.read_csv(_required(benchmark_directory / "results.csv"))
 
     contribution = contribution.copy()
-    contribution["party_method"] = contribution["party"].astype(str) + ":" + contribution[
-        "method"
-    ].astype(str)
+    contribution["party_method"] = (
+        contribution["party"].astype(str) + ":" + contribution["method"].astype(str)
+    )
     dropout = dropout.copy()
-    dropout["phase_scenario"] = dropout["phase"].astype(str) + ":" + dropout[
-        "scenario"
-    ].astype(str)
+    dropout["phase_scenario"] = dropout["phase"].astype(str) + ":" + dropout["scenario"].astype(str)
 
     for paths in (
         save_category_metric_plot(
