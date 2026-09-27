@@ -21,7 +21,10 @@ class VFLLogisticRegression:
     objective. Mini-batches are entity-aligned across every party and are
     shuffled deterministically from ``seed``. Passive-party logit contributions
     and residual signals cross the simulated ``Message`` transport boundary;
-    raw party feature matrices remain local.
+    raw party feature matrices remain local. ``residual_noise_std`` optionally
+    adds deterministic Gaussian noise only to residuals sent to passive parties,
+    enabling empirical privacy/utility mitigation experiments without changing
+    the active party's target-owned gradient or intercept update.
     """
 
     learning_rate: float = 0.1
@@ -35,6 +38,7 @@ class VFLLogisticRegression:
     learning_rate_schedule: str = "constant"
     early_stopping_rounds: int | None = None
     warm_start: bool = False
+    residual_noise_std: float = 0.0
     seed: int = 42
     transport: InMemoryTransport = field(default_factory=InMemoryTransport)
     weights_: dict[str, np.ndarray] = field(default_factory=dict, init=False)
@@ -62,6 +66,8 @@ class VFLLogisticRegression:
             )
         if self.early_stopping_rounds is not None and self.early_stopping_rounds <= 0:
             raise ValueError("early_stopping_rounds must be positive when supplied")
+        if not np.isfinite(self.residual_noise_std) or self.residual_noise_std < 0:
+            raise ValueError("residual_noise_std must be finite and non-negative")
         if isinstance(self.class_weight, str) and self.class_weight != "balanced":
             raise ValueError("class_weight string must be 'balanced'")
         if isinstance(self.class_weight, dict) and any(
@@ -176,6 +182,7 @@ class VFLLogisticRegression:
         if not np.isfinite(sample_weight).all() or float(sample_weight.sum()) <= 0.0:
             raise ValueError("sample weights must be finite with positive total weight")
         rng = np.random.default_rng(self.seed)
+        noise_rng = np.random.default_rng(self.seed + 104729)
         batch_size = min(self.batch_size or n, n)
 
         validation_parties: list[PassiveParty] | None = None
@@ -227,9 +234,15 @@ class VFLLogisticRegression:
                 residual *= len(batch) / batch_weight_sum
                 delivered_residuals: dict[str, np.ndarray] = {active.name: residual}
                 for party in passive:
+                    party_residual = residual
+                    if self.residual_noise_std > 0.0:
+                        party_residual = residual + noise_rng.normal(
+                            scale=self.residual_noise_std,
+                            size=residual.shape,
+                        )
                     delivered_residuals[party.name] = np.asarray(
                         self.transport.send(
-                            residual,
+                            party_residual,
                             message_type="residual_signal",
                             sender_role=active.name,
                             receiver_role=party.name,
