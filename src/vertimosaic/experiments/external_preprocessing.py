@@ -23,6 +23,7 @@ class ExternalPreparedSplits:
     test_passive: list[PassiveParty]
     preprocessing_seconds: float
     preprocessor_paths: dict[str, str]
+    feature_metadata: dict[str, list[dict[str, str]]]
 
 
 def _column_types(frame: pd.DataFrame) -> tuple[list[str], list[str]]:
@@ -40,6 +41,7 @@ def prepare_external_splits_locally(
     """Fit one preprocessor per party on TRAIN only and transform all entity splits."""
     transformed: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
     paths: dict[str, str] = {}
+    feature_metadata: dict[str, list[dict[str, str]]] = {}
     start = time.perf_counter()
 
     for party in ("bank", "telecom", "insurance", "retail"):
@@ -60,6 +62,7 @@ def prepare_external_splits_locally(
         preprocessor.save(path)
         transformed[party] = (train_x, validation_x, test_x)
         paths[party] = str(path)
+        feature_metadata[party] = preprocessor.output_feature_metadata()
 
     preprocessing_seconds = time.perf_counter() - start
     bank_train, bank_validation, bank_test = transformed["bank"]
@@ -87,4 +90,5 @@ def prepare_external_splits_locally(
         test_passive=test_passive,
         preprocessing_seconds=preprocessing_seconds,
         preprocessor_paths=paths,
+        feature_metadata=feature_metadata,
     )
