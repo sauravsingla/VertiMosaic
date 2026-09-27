@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Full prompt evidence
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/full-prompt-evidence.yml"
+      - "scripts/run_full_prompt_evidence.py"
+      - "src/vertimosaic/reporting/case_study.py"
+      - "src/vertimosaic/experiments/**"
+      - "src/vertimosaic/datasets/**"
+      - "src/vertimosaic/evaluation/**"
+      - "src/vertimosaic/models/**"
+      - "tests/test_case_study.py"
+      - "pyproject.toml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/full-prompt-evidence.yml"
+      - "scripts/run_full_prompt_evidence.py"
+      - "src/vertimosaic/reporting/case_study.py"
+      - "src/vertimosaic/experiments/**"
+      - "src/vertimosaic/datasets/**"
+      - "src/vertimosaic/evaluation/**"
+      - "src/vertimosaic/models/**"
+      - "tests/test_case_study.py"
+      - "pyproject.toml"
+
+jobs:
+  full-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - name: Verify strict case-study behavior
+        run: pytest -q tests/test_case_study.py
+      - name: Run exact full-scale and provider-backed prompt evidence
+        run: |
+          python scripts/run_full_prompt_evidence.py \
+            --seed 42 \
+            --bootstrap-replicates 100 \
+            --insurance-sample-size 5000
+      - name: Verify evidence manifest belongs to this commit
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = json.loads(Path("reports/full_prompt_evidence.json").read_text(encoding="utf-8"))
+          assert evidence["git_sha"] == os.environ["GITHUB_SHA"]
+          assert evidence["synthetic_benchmark_sizes"] == [10000, 30000, 50000, 100000]
+          assert evidence["observed_target_external"]["target_blind_linkage"] is True
+          case_study = evidence["distributed_signal_external"]["case_study"]
+          assert case_study["qualifying_case"] is True
+          assert case_study["decision_changed"] is True
+          assert case_study["absolute_probability_shift"] >= case_study["minimum_probability_shift"]
+          assert evidence["no_fabricated_metrics"] is True
+          PY
+      - name: Retain full measured prompt evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vertimosaic-full-prompt-evidence
+          path: |
+            reports/full_prompt_evidence.json
+            reports/observed_target_external_evidence.json
+            reports/distributed_signal_external_evidence.json
+            benchmarks/results.csv
+            benchmarks/environment.json
+            artifacts/*_preprocessor.joblib
+            runs/
+          if-no-files-found: error
+          retention-days: 90
