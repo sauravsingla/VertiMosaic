@@ -112,8 +112,7 @@ class VFLLogisticRegression:
     ) -> float:
         eps = 1e-12
         data_loss = -np.average(
-            y * np.log(probabilities + eps)
-            + (1.0 - y) * np.log(1.0 - probabilities + eps),
+            y * np.log(probabilities + eps) + (1.0 - y) * np.log(1.0 - probabilities + eps),
             weights=sample_weight,
         )
         return float(data_loss + self._penalty())
@@ -242,9 +241,7 @@ class VFLLogisticRegression:
                 self.validation_loss_history_.append(validation_loss)
                 if validation_loss < best_validation_loss - 1e-12:
                     best_validation_loss = validation_loss
-                    best_weights = {
-                        name: weights.copy() for name, weights in self.weights_.items()
-                    }
+                    best_weights = {name: weights.copy() for name, weights in self.weights_.items()}
                     best_intercept = self.intercept_
                     self.best_iteration_ = epoch
                     rounds_without_improvement = 0
