@@ -29,7 +29,7 @@ class HistogramRoutingState:
     """Token-only handle to party-local histogram routing state.
 
     This object is safe for the coordinating model to retain: it contains no threshold
-    arrays and no raw rows. Numeric thresholds stay inside the owning party object.
+    arrays and no raw rows. Numeric thresholds stay inside the party-layer private store.
     """
 
     party_name: str
@@ -48,7 +48,7 @@ class HistogramRoutingState:
 
 @dataclass(frozen=True)
 class _HistogramThresholdState:
-    """Immutable derived thresholds retained only by the owning party."""
+    """Immutable derived thresholds retained only by the party layer."""
 
     thresholds: tuple[np.ndarray, ...] = field(repr=False, compare=False)
     max_bins: int
@@ -74,6 +74,13 @@ class _HistogramThresholdState:
         if bin_ref < 0 or bin_ref >= len(feature_thresholds):
             raise ValueError("split bin reference is out of range for routing state")
         return float(feature_thresholds[bin_ref])
+
+
+# In the in-process simulator, train/validation/test objects with the same party name
+# represent partitions owned by one organization. Derived histogram thresholds therefore
+# live in this module-private party-layer registry, keyed by an opaque handle. The
+# coordinator receives only HistogramRoutingState; raw rows never enter this registry.
+_HISTOGRAM_THRESHOLD_REGISTRY: dict[tuple[str, str], _HistogramThresholdState] = {}
 
 
 class HistogramCandidate(TypedDict):
@@ -137,12 +144,7 @@ class PassiveParty(Party):
         return x.T @ residual / x.shape[0]
 
     def prepare_histogram_bins(self, max_bins: int) -> None:
-        """Fit and retain party-local quantile bins once for histogram tree training.
-
-        Thresholds and binned row values remain party-local. Candidate generation then
-        aggregates gradients/Hessians by retained bin codes instead of recomputing raw
-        value quantiles at every tree node.
-        """
+        """Fit and retain party-local quantile bins once for histogram tree training."""
         if max_bins < 2:
             raise ValueError("max_bins must be at least 2")
         binned = np.zeros(self._x.shape, dtype=np.int32)
@@ -166,16 +168,18 @@ class PassiveParty(Party):
             tuple(thresholds[index] for index in range(self.n_features)),
             max_bins=max_bins,
         )
-        self._histogram_bins = binned
-        self._histogram_thresholds = thresholds
-        self._histogram_max_bins = max_bins
-        self._histogram_threshold_state = private_state
-        self._histogram_routing_state = HistogramRoutingState(
+        handle = HistogramRoutingState(
             party_name=self.name,
             state_ref=uuid4().hex,
             n_features=self.n_features,
             max_bins=max_bins,
         )
+        _HISTOGRAM_THRESHOLD_REGISTRY[(self.name, handle.state_ref)] = private_state
+        self._histogram_bins = binned
+        self._histogram_thresholds = thresholds
+        self._histogram_max_bins = max_bins
+        self._histogram_threshold_state = private_state
+        self._histogram_routing_state = handle
 
     def _ensure_histogram_bins(self, max_bins: int) -> None:
         if self._histogram_bins is None or self._histogram_max_bins != max_bins:
@@ -188,11 +192,7 @@ class PassiveParty(Party):
         return self._histogram_routing_state
 
     def share_histogram_routing_state_with(self, other: PassiveParty) -> None:
-        """Attach derived tree-routing state to another split owned by the same party.
-
-        This models train/validation/test partitions inside one organization. Only
-        derived threshold state is shared; raw feature rows remain in their own object.
-        """
+        """Attach derived tree-routing state to another split owned by the same party."""
         if other.name != self.name:
             raise ValueError("histogram routing state can only be shared within one party")
         if other.n_features != self.n_features:
@@ -210,11 +210,18 @@ class PassiveParty(Party):
             raise ValueError("routing handle belongs to a different party")
         if handle.n_features != self.n_features:
             raise ValueError("routing state feature width does not match this party")
-        if self._histogram_routing_state is None or self._histogram_threshold_state is None:
-            raise RuntimeError("party-local histogram threshold state is unavailable")
-        if handle.state_ref != self._histogram_routing_state.state_ref:
+
+        state: _HistogramThresholdState | None = None
+        if (
+            self._histogram_routing_state is not None
+            and self._histogram_threshold_state is not None
+            and handle.state_ref == self._histogram_routing_state.state_ref
+        ):
+            state = self._histogram_threshold_state
+        if state is None:
+            state = _HISTOGRAM_THRESHOLD_REGISTRY.get((self.name, handle.state_ref))
+        if state is None:
             raise ValueError("routing handle does not match this party's local tree state")
-        state = self._histogram_threshold_state
         if state.n_features != self.n_features or state.max_bins != handle.max_bins:
             raise ValueError("private routing state metadata does not match the handle")
         return state
@@ -325,7 +332,7 @@ class PassiveParty(Party):
         split_ref: OpaqueSplitReference,
         routing_state: HistogramRoutingState | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Apply an opaque training split using only party-owned threshold state."""
+        """Apply an opaque split using party-owned training-derived threshold state."""
         handle = routing_state or self._histogram_routing_state
         if handle is None:
             raise RuntimeError("party-local histogram routing handle is unavailable")
