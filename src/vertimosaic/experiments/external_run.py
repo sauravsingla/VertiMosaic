@@ -2,25 +2,38 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import asdict
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
+import psutil
 
+from vertimosaic.alignment import EntityAligner
 from vertimosaic.baselines import fit_centralized_baseline
+from vertimosaic.datasets import ExternalDatasetBundle
 from vertimosaic.evaluation import (
     binary_metrics,
     bootstrap_confidence_intervals,
+    communication_event_frame,
+    communication_totals,
     confusion_at_threshold,
     entity_level_split,
     paired_bootstrap_difference,
     select_f1_threshold,
 )
 from vertimosaic.experiments.external import linkage_manifest_dict, prepare_external_benchmark
-from vertimosaic.experiments.external_preprocessing import prepare_external_splits_locally
+from vertimosaic.experiments.external_preprocessing import (
+    ExternalPreparedSplits,
+    prepare_external_splits_locally,
+)
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.provenance import FeatureProvenance
 from vertimosaic.reporting import select_sanitized_case_study
+from vertimosaic.reproducibility import RunArtifacts
 
 
 def _external_model(
@@ -86,6 +99,94 @@ def _party_permuted_probabilities(
     return output
 
 
+def _training_frame(model: VFLLogisticRegression | VFLHistGBDT) -> pd.DataFrame:
+    if isinstance(model, VFLLogisticRegression):
+        frame = pd.DataFrame(
+            {"iteration": np.arange(len(model.loss_history_)), "loss": model.loss_history_}
+        )
+        if model.validation_loss_history_:
+            values = model.validation_loss_history_[: len(frame)]
+            frame.loc[: len(values) - 1, "validation_loss"] = values
+        return frame
+    frame = pd.DataFrame(
+        {
+            "tree": np.arange(len(model.training_loss_history_)),
+            "training_loss": model.training_loss_history_,
+        }
+    )
+    if model.validation_loss_history_:
+        frame["validation_loss"] = model.validation_loss_history_[: len(frame)]
+    return frame
+
+
+def _frame_sha256(frame: pd.DataFrame) -> str:
+    hashed = pd.util.hash_pandas_object(frame, index=True).to_numpy(dtype=np.uint64)
+    return sha256(hashed.tobytes()).hexdigest()
+
+
+def _array_sha256(values: np.ndarray) -> str:
+    array = np.ascontiguousarray(values)
+    digest = sha256()
+    digest.update(str(array.dtype).encode("utf-8"))
+    digest.update(repr(array.shape).encode("utf-8"))
+    digest.update(array.tobytes())
+    return digest.hexdigest()
+
+
+def _external_feature_provenance(
+    benchmark_source_provenance: dict[str, list[FeatureProvenance]],
+    prepared: ExternalPreparedSplits,
+) -> pd.DataFrame:
+    records: list[FeatureProvenance] = []
+    for party, transformed_features in prepared.feature_metadata.items():
+        source_lookup = {
+            record.feature: record for record in benchmark_source_provenance.get(party, [])
+        }
+        for transformed in transformed_features:
+            source_feature = transformed["source_column"]
+            original = source_lookup.get(source_feature)
+            if original is None:
+                records.append(
+                    FeatureProvenance(
+                        party=party,
+                        feature=transformed["feature"],
+                        external_dataset=party,
+                        source_column=source_feature,
+                        transformation=transformed["transformation"],
+                        source_type="real_external_derived",
+                        observed_or_derived="derived",
+                        semi_synthetic=party != "bank",
+                        notes="passive-party row assignment is semi-synthetic" if party != "bank" else "",
+                    )
+                )
+                continue
+            linkage_note = (
+                "semi-synthetic donor linkage -> " if party != "bank" else ""
+            )
+            records.append(
+                FeatureProvenance(
+                    party=party,
+                    feature=transformed["feature"],
+                    external_dataset=original.external_dataset,
+                    source_column=original.source_column,
+                    transformation=(
+                        f"{linkage_note}{original.transformation} -> "
+                        f"{transformed['transformation']}"
+                    ),
+                    source_type=original.source_type,
+                    observed_or_derived="derived",
+                    semi_synthetic=party != "bank",
+                    notes=(
+                        "source feature values come from the public dataset; cross-domain entity "
+                        "assignment is semi-synthetic"
+                        if party != "bank"
+                        else ""
+                    ),
+                )
+            )
+    return pd.DataFrame([asdict(record) for record in records])
+
+
 def run_external_experiment(
     *,
     mode: str = "observed_target_external",
@@ -95,6 +196,9 @@ def run_external_experiment(
     insurance_sample_size: int | None = None,
     bootstrap_replicates: int = 100,
     output: Path | None = None,
+    write_run: bool = True,
+    runs_root: Path = Path("runs"),
+    bundles: dict[str, ExternalDatasetBundle] | None = None,
 ) -> dict[str, Any]:
     preparation_start = time.perf_counter()
     benchmark = prepare_external_benchmark(
@@ -102,8 +206,13 @@ def run_external_experiment(
         cross_party_correlation=cross_party_correlation,
         seed=seed,
         insurance_sample_size=insurance_sample_size,
+        bundles=bundles,
     )
     benchmark_preparation_seconds = time.perf_counter() - preparation_start
+    data_preparation_seconds = max(
+        0.0,
+        benchmark_preparation_seconds - benchmark.entity_alignment_seconds,
+    )
     split = entity_level_split(benchmark.active.labels, seed=seed)
     prepared = prepare_external_splits_locally(benchmark, split)
     train_active = prepared.train_active
@@ -114,9 +223,12 @@ def run_external_experiment(
     test_passive = prepared.test_passive
 
     model = _external_model(model_name, seed, early_stopping=True)
+    process = psutil.Process()
+    rss_before = process.memory_info().rss
     start = time.perf_counter()
     _fit_external_model(model, train_active, train_passive, val_active, val_passive)
     training_seconds = time.perf_counter() - start
+    peak_rss_bytes = max(rss_before, process.memory_info().rss)
     validation_p = model.predict_proba([val_active, *val_passive])[:, 1]
     threshold = select_f1_threshold(val_active.labels, validation_p)
     inference_start = time.perf_counter()
@@ -165,6 +277,10 @@ def run_external_experiment(
         seed=seed,
     )
     all_party_comparison["baseline"] = "centralized_all_party_non_federated"
+    communication = communication_totals(model.transport.audit_log)
+    training_steps = (
+        model.n_iter_ if isinstance(model, VFLLogisticRegression) else len(model.trees_)
+    )
     payload: dict[str, Any] = {
         "benchmark_description": "externally grounded semi-synthetic cross-industry VFL benchmark",
         "mode": mode,
@@ -178,11 +294,15 @@ def run_external_experiment(
         "comparisons": [bank_comparison, all_party_comparison],
         "confusion_matrix": confusion_at_threshold(test_active.labels, test_p, threshold),
         "threshold_selected_on_validation": threshold,
-        "benchmark_preparation_seconds": benchmark_preparation_seconds,
+        "data_preparation_seconds": data_preparation_seconds,
+        "entity_alignment_seconds": benchmark.entity_alignment_seconds,
         "preprocessing_seconds": prepared.preprocessing_seconds,
         "training_seconds": training_seconds,
         "inference_seconds": inference_seconds,
-        "estimated_communication_bytes": model.transport.estimated_payload_bytes,
+        "training_steps": training_steps,
+        "peak_rss_bytes": int(peak_rss_bytes),
+        "estimated_communication_bytes": int(model.transport.estimated_payload_bytes),
+        "communication": communication,
         "preprocessor_artifacts": prepared.preprocessor_paths,
         "preprocessing_fit_scope": "TRAIN only, independently per party",
         "linkage": linkage_manifest_dict(benchmark),
@@ -205,6 +325,60 @@ def run_external_experiment(
             party_permuted,
             threshold=threshold,
         )
+
+    if write_run:
+        run = RunArtifacts.create(root=runs_root)
+        aligner = EntityAligner(salt=f"vertimosaic-external-{seed}")
+        predictions = pd.DataFrame(
+            {
+                "entity_id": [aligner.pseudonymize(str(index)) for index in split.test],
+                "target": test_active.labels,
+                "probability": test_p,
+            }
+        )
+        dataset_hashes = {
+            f"{party}_linked_features": _frame_sha256(frame)
+            for party, frame in benchmark.feature_frames.items()
+        }
+        dataset_hashes["bank_target"] = _array_sha256(benchmark.active.labels)
+        directory = run.finalize(
+            config={
+                "mode": mode,
+                "model": model_name,
+                "seed": seed,
+                "cross_party_correlation": cross_party_correlation,
+                "insurance_sample_size": insurance_sample_size,
+                "bootstrap_replicates": bootstrap_replicates,
+                "entity_split": {"train": 0.70, "validation": 0.15, "test": 0.15},
+            },
+            seed=seed,
+            dataset_provenance={
+                "benchmark_description": (
+                    "externally grounded semi-synthetic cross-industry VFL benchmark"
+                ),
+                "sources": benchmark.source_metadata,
+                "dataset_hashes": dataset_hashes,
+                "four_sources_same_real_people": False,
+                "raw_source_ids_exported": False,
+            },
+            linkage_manifest={
+                "method": "gaussian_copula_rank_proximity",
+                "target_blind": True,
+                "target_generated_after_linkage": mode == "distributed_signal_external",
+                "parties": linkage_manifest_dict(benchmark),
+                "pseudonymization": "SHA-256 research pseudonymization; not PSI",
+            },
+            metrics=payload,
+            predictions=predictions,
+            training_history=_training_frame(model),
+            communication=communication_event_frame(model.transport.audit_log),
+            feature_provenance=_external_feature_provenance(
+                benchmark.source_provenance,
+                prepared,
+            ),
+        )
+        payload["run_directory"] = str(directory)
+
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
