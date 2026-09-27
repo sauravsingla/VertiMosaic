@@ -24,6 +24,7 @@ from vertimosaic.experiments import (
     run_drift_study,
     run_dropout_study,
     run_external_experiment,
+    run_ieee_cis_experiment,
     run_overlap_study,
     run_synthetic_experiment,
     write_demo_report,
@@ -285,6 +286,26 @@ def prepare_ieee_cis_command(
             indent=2,
         )
     )
+
+
+@app.command("run-ieee-cis")
+def run_ieee_cis_command(
+    transaction: Annotated[Path, typer.Option(exists=True, readable=True)],
+    identity: Annotated[Path, typer.Option(exists=True, readable=True)],
+    model: str = typer.Option("logistic", help="logistic or vfl-hist-gbdt"),
+    seed: int = 42,
+    bootstrap_replicates: int = typer.Option(1000, min=10),
+    output: Path = Path("reports/ieee_cis_linked.json"),
+) -> None:
+    payload = run_ieee_cis_experiment(
+        transaction,
+        identity,
+        model_name=model,
+        seed=seed,
+        bootstrap_replicates=bootstrap_replicates,
+        output=output,
+    )
+    typer.echo(json.dumps(payload, indent=2, sort_keys=True, default=str))
 
 
 if __name__ == "__main__":
