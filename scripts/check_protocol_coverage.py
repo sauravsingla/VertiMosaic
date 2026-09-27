@@ -3,7 +3,6 @@ import argparse
 import json
 from pathlib import Path
 
-
 CRITICAL_FILES = (
     "vertimosaic/models/vfl_logistic.py",
     "vertimosaic/models/vfl_hist_gbdt.py",
