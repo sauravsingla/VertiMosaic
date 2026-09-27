@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import asdict
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -36,12 +37,33 @@ def slice_parties(
     )
 
 
+def _array_sha256(values: np.ndarray) -> str:
+    array = np.ascontiguousarray(values)
+    digest = sha256()
+    digest.update(str(array.dtype).encode("utf-8"))
+    digest.update(repr(array.shape).encode("utf-8"))
+    digest.update(array.tobytes())
+    return digest.hexdigest()
+
+
+def _synthetic_dataset_hashes(
+    active: ActiveParty, passive: list[PassiveParty]
+) -> dict[str, str]:
+    hashes = {
+        "bank_features": _array_sha256(active._x),
+        "bank_labels": _array_sha256(active.labels),
+    }
+    hashes.update({f"{party.name}_features": _array_sha256(party._x) for party in passive})
+    return hashes
+
+
 def _make_model(model_name: str, seed: int) -> VFLLogisticRegression | VFLHistGBDT:
     if model_name == "logistic":
         return VFLLogisticRegression(
             learning_rate=0.08,
             max_iter=500,
             l2=1e-3,
+            early_stopping_rounds=5,
             seed=seed,
         )
     if model_name == "vfl-hist-gbdt":
@@ -61,9 +83,13 @@ def _communication_frame(model: VFLLogisticRegression | VFLHistGBDT) -> pd.DataF
 
 def _training_frame(model: VFLLogisticRegression | VFLHistGBDT) -> pd.DataFrame:
     if isinstance(model, VFLLogisticRegression):
-        return pd.DataFrame(
+        frame = pd.DataFrame(
             {"iteration": np.arange(len(model.loss_history_)), "loss": model.loss_history_}
         )
+        if model.validation_loss_history_:
+            values = model.validation_loss_history_[: len(frame)]
+            frame.loc[: len(values) - 1, "validation_loss"] = values
+        return frame
     frame = pd.DataFrame(
         {
             "tree": np.arange(len(model.training_loss_history_)),
@@ -114,10 +140,7 @@ def run_synthetic_experiment(
     process = psutil.Process()
     rss_before = process.memory_info().rss
     start = time.perf_counter()
-    if isinstance(model, VFLHistGBDT):
-        model.fit(train_active, train_passive, val_active, val_passive)
-    else:
-        model.fit(train_active, train_passive)
+    model.fit(train_active, train_passive, val_active, val_passive)
     training_seconds = time.perf_counter() - start
     peak_rss_bytes = max(rss_before, process.memory_info().rss)
     val_p = model.predict_proba([val_active, *val_passive])[:, 1]
@@ -210,7 +233,11 @@ def run_synthetic_experiment(
                 "bootstrap_replicates": bootstrap_replicates,
             },
             seed=seed,
-            dataset_provenance={"source_type": "fully_synthetic", "rows": rows},
+            dataset_provenance={
+                "source_type": "fully_synthetic",
+                "rows": rows,
+                "dataset_hashes": _synthetic_dataset_hashes(active, passive),
+            },
             linkage_manifest={"method": "shared synthetic latent entities", "target_blind": True},
             metrics=payload,
             predictions=predictions,
