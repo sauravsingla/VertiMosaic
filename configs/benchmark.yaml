@@ -8,4 +8,4 @@ cross_party_correlation: 0.25
 overlap_fraction: 1.0
 missing_party_method: intersection_only
 insurance_sample_size: null
-bootstrap_replicates: 100
+bootstrap_replicates: 1000
