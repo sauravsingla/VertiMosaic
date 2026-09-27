@@ -70,9 +70,7 @@ def run_full_prompt_evidence(
             "full benchmark sizes differ from prompt: "
             f"{measured_sizes} != {_REQUIRED_SYNTHETIC_SIZES}"
         )
-    required_resources = benchmark[
-        ["training_seconds", "inference_seconds", "peak_rss_bytes"]
-    ]
+    required_resources = benchmark[["training_seconds", "inference_seconds", "peak_rss_bytes"]]
     if required_resources.isna().any().any():
         raise RuntimeError("full benchmark contains missing required resource measurements")
 
