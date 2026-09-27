@@ -97,8 +97,8 @@ def gbdt_local_feature_importance(
             message = f"missing split-owning parties for local importance: {sorted(missing)}"
             raise ValueError(message)
         for party_name, records in split_records.items():
-            aggregates = party_map[party_name].aggregate_local_split_importance(records)
-            for feature_index, statistics in aggregates.items():
+            local_aggregates = party_map[party_name].aggregate_local_split_importance(records)
+            for feature_index, statistics in local_aggregates.items():
                 rows_by_party[party_name].append(
                     {
                         "party": party_name,
@@ -109,18 +109,18 @@ def gbdt_local_feature_importance(
                     }
                 )
     else:
-        aggregates: dict[tuple[str, int], list[float]] = defaultdict(list)
+        fallback_gains: dict[tuple[str, int], list[float]] = defaultdict(list)
         for tree in model.trees_:
             for node in _walk_splits(tree):
                 if node.party is None or node.feature is None:
                     continue
-                aggregates[(node.party, node.feature)].append(node.gain)
-        for (party, feature_index), gains in aggregates.items():
+                fallback_gains[(node.party, node.feature)].append(node.gain)
+        for (party_name, feature_index), gains in fallback_gains.items():
             gain_sum = float(np.sum(gains))
-            rows_by_party[party].append(
+            rows_by_party[party_name].append(
                 {
-                    "party": party,
-                    "feature": _feature_label(party, feature_index, feature_names),
+                    "party": party_name,
+                    "feature": _feature_label(party_name, feature_index, feature_names),
                     "split_count": len(gains),
                     "gain_sum": gain_sum,
                     "gain_mean": gain_sum / len(gains),
