@@ -45,22 +45,25 @@ def test_histogram_candidates_hide_numeric_threshold_and_route_by_opaque_referen
     assert set(left).isdisjoint(set(right))
 
 
-def test_histogram_routing_state_rejects_invalid_references() -> None:
+def test_histogram_routing_handle_contains_no_threshold_state() -> None:
     with pytest.raises(ValueError, match="max_bins"):
-        HistogramRoutingState((np.array([0.5]),), max_bins=1)
+        HistogramRoutingState("telecom", "state", n_features=1, max_bins=1)
+    with pytest.raises(ValueError, match="feature width"):
+        HistogramRoutingState("telecom", "state", n_features=-1, max_bins=2)
+    with pytest.raises(ValueError, match="identifiers"):
+        HistogramRoutingState("", "state", n_features=1, max_bins=2)
 
-    state = HistogramRoutingState((np.array([0.5]),), max_bins=2)
-    with pytest.raises(ValueError, match="feature reference"):
-        state.threshold_for(OpaqueSplitReference(feature_ref=2, bin_ref=0))
-    with pytest.raises(ValueError, match="bin reference"):
-        state.threshold_for(OpaqueSplitReference(feature_ref=0, bin_ref=2))
+    handle = HistogramRoutingState("telecom", "state", n_features=1, max_bins=2)
+    assert set(vars(handle)) == {"party_name", "state_ref", "n_features", "max_bins"}
+    assert not any(isinstance(value, np.ndarray) for value in vars(handle).values())
+    assert "threshold" not in repr(handle).lower()
 
 
 def test_party_local_histogram_guards_fail_closed() -> None:
     party = PassiveParty("telecom", np.array([[0.0], [1.0], [2.0], [3.0]]))
     with pytest.raises(RuntimeError, match="bins were not prepared"):
         party.export_histogram_routing_state()
-    with pytest.raises(RuntimeError, match="routing state is unavailable"):
+    with pytest.raises(RuntimeError, match="routing handle is unavailable"):
         party.route_split(np.arange(4), OpaqueSplitReference(0, 0))
     with pytest.raises(ValueError, match="out of range"):
         party.route(np.arange(4), 3, 0.5)
@@ -86,18 +89,19 @@ def test_party_local_histogram_guards_fail_closed() -> None:
         )
 
 
-def test_party_local_importance_and_routing_state_width_guards() -> None:
+def test_party_local_importance_and_routing_handle_guards() -> None:
     party = PassiveParty("telecom", np.column_stack([np.arange(4), np.arange(4)]))
     with pytest.raises(ValueError, match="feature reference"):
         party.aggregate_local_split_importance([(OpaqueSplitReference(3, 0), 1.0)])
 
-    one_feature_state = HistogramRoutingState((np.array([0.5]),), max_bins=2)
+    party.prepare_histogram_bins(2)
+    split_ref = OpaqueSplitReference(0, 0)
+    wrong_width = HistogramRoutingState("telecom", "missing", n_features=1, max_bins=2)
     with pytest.raises(ValueError, match="feature width"):
-        party.route_split(
-            np.arange(4),
-            OpaqueSplitReference(0, 0),
-            one_feature_state,
-        )
+        party.route_split(np.arange(4), split_ref, wrong_width)
+    wrong_party = HistogramRoutingState("insurance", "missing", n_features=2, max_bins=2)
+    with pytest.raises(ValueError, match="different party"):
+        party.route_split(np.arange(4), split_ref, wrong_party)
 
 
 def test_evaluation_routing_uses_training_party_histogram_state() -> None:
@@ -126,6 +130,24 @@ def test_evaluation_routing_uses_training_party_histogram_state() -> None:
     assert np.array_equal(left, np.array([0, 1]))
     assert np.array_equal(right, np.array([2, 3]))
     assert not evaluation_party.histogram_bins_ready
+
+
+def test_gbdt_model_retains_only_token_routing_handles() -> None:
+    rng = np.random.default_rng(29)
+    rows = 80
+    bank = ActiveParty(
+        "bank",
+        rng.normal(size=(rows, 2)),
+        np.tile(np.array([0.0, 1.0]), rows // 2),
+    )
+    telecom = PassiveParty("telecom", rng.normal(size=(rows, 2)))
+    model = VFLHistGBDT(n_estimators=1, max_depth=1, min_samples_leaf=5, seed=29)
+    model.fit(bank, [telecom])
+    assert model._routing_states
+    for handle in model._routing_states.values():
+        assert set(vars(handle)) == {"party_name", "state_ref", "n_features", "max_bins"}
+        assert not any(isinstance(value, np.ndarray) for value in vars(handle).values())
+        assert "threshold" not in repr(handle).lower()
 
 
 def test_gbdt_models_real_protocol_payloads_through_transport_messages() -> None:
