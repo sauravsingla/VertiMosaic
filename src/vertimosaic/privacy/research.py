@@ -6,6 +6,7 @@ from math import sqrt
 from typing import Any
 
 import numpy as np
+from scipy.stats import t as student_t
 from sklearn.metrics import roc_auc_score
 
 from vertimosaic.datasets.synthetic import make_vertical_synthetic
@@ -76,8 +77,17 @@ def _confidence_interval(values: list[float]) -> dict[str, float | int]:
             "ci95_high": float("nan"),
         }
     mean = float(finite.mean())
-    std = float(finite.std(ddof=1)) if finite.size > 1 else 0.0
-    half_width = 1.96 * std / sqrt(float(finite.size))
+    if finite.size == 1:
+        return {
+            "n": 1,
+            "mean": mean,
+            "std": 0.0,
+            "ci95_low": mean,
+            "ci95_high": mean,
+        }
+    std = float(finite.std(ddof=1))
+    critical = float(student_t.ppf(0.975, df=int(finite.size - 1)))
+    half_width = critical * std / sqrt(float(finite.size))
     return {
         "n": int(finite.size),
         "mean": mean,
@@ -251,7 +261,7 @@ def run_privacy_research(
 ) -> dict[str, Any]:
     """Run the complete multi-factor privacy/utility experiment suite.
 
-    Every sweep retains per-seed raw measurements and reports 95% normal-approximation
+    Every sweep retains per-seed raw measurements and reports two-sided 95% Student-t
     confidence intervals across independent deterministic seeds. The suite measures
     attack behavior against dataset size, party count, training rounds, regularization,
     model family, and mitigation strength. These are empirical measurements, not formal
@@ -447,7 +457,7 @@ def run_privacy_research(
     return {
         "schema_version": 2,
         "formal_privacy_guarantee": False,
-        "confidence_interval": "mean +/- 1.96 * sample_std / sqrt(n)",
+        "confidence_interval": "two-sided 95% Student-t interval over independent seed runs",
         "config": asdict(cfg),
         "experiments": {
             "attack_vs_dataset_size": {
@@ -486,7 +496,7 @@ def run_privacy_research(
             "membership_advantage": "Maximum measured TPR-FPR over confidence thresholds.",
             "label_inference_accuracy": "Binary target inference from passive residual signals.",
             "routing_exposure_fraction": "Fraction of training entities exposed at passive splits.",
-            "holdout_roc_auc": "Predictive utility measured on independently generated holdout rows.",
+            "holdout_roc_auc": "Predictive utility on independently generated holdout rows.",
         },
     }
 
