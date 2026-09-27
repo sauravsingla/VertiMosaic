@@ -138,6 +138,7 @@ class VFLHistGBDT:
             or leaf_limit_reached
         ):
             return node
+        active_name = next(iter(parties))
         best_gain = 0.0
         best: tuple[PassiveParty, dict[str, float | int]] | None = None
         for party in parties.values():
@@ -150,15 +151,16 @@ class VFLHistGBDT:
                 self.min_samples_leaf,
                 feature_indices,
             )
-            self.transport.send(
-                np.empty((len(candidates), 6), dtype=float),
-                message_type="candidate_histogram_metadata",
-                sender_role=party.name,
-                receiver_role="active",
-                direction="forward",
-                stage="tree",
-                step=tree_index,
-            )
+            if party.name != active_name:
+                self.transport.send(
+                    np.empty((len(candidates), 6), dtype=float),
+                    message_type="candidate_histogram_metadata",
+                    sender_role=party.name,
+                    receiver_role=active_name,
+                    direction="forward",
+                    stage="tree",
+                    step=tree_index,
+                )
             for cand in candidates:
                 gain = self._split_gain(cand)
                 if gain > best_gain:
@@ -170,15 +172,16 @@ class VFLHistGBDT:
         feature = int(cand["feature"])
         threshold = float(cand["threshold"])
         left_idx, right_idx = party.route(indices, feature, threshold)
-        self.transport.send(
-            np.asarray([len(left_idx), len(right_idx)]),
-            message_type="partition_routing_counts",
-            sender_role=party.name,
-            receiver_role="active",
-            direction="forward",
-            stage="tree",
-            step=tree_index,
-        )
+        if party.name != active_name:
+            self.transport.send(
+                np.asarray([len(left_idx), len(right_idx)]),
+                message_type="partition_routing_counts",
+                sender_role=party.name,
+                receiver_role=active_name,
+                direction="forward",
+                stage="tree",
+                step=tree_index,
+            )
         if len(left_idx) < self.min_samples_leaf or len(right_idx) < self.min_samples_leaf:
             return node
         node.party = party.name
@@ -284,24 +287,25 @@ class VFLHistGBDT:
             probability = _sigmoid(raw)
             gradients = probability - y
             hessians = np.maximum(probability * (1.0 - probability), 1e-8)
-            self.transport.send(
-                gradients,
-                message_type="gradients",
-                sender_role="active",
-                receiver_role="passive_parties",
-                direction="backward",
-                stage="tree",
-                step=tree_index,
-            )
-            self.transport.send(
-                hessians,
-                message_type="hessians",
-                sender_role="active",
-                receiver_role="passive_parties",
-                direction="backward",
-                stage="tree",
-                step=tree_index,
-            )
+            for party in passive:
+                self.transport.send(
+                    gradients,
+                    message_type="gradients",
+                    sender_role=active.name,
+                    receiver_role=party.name,
+                    direction="backward",
+                    stage="tree",
+                    step=tree_index,
+                )
+                self.transport.send(
+                    hessians,
+                    message_type="hessians",
+                    sender_role=active.name,
+                    receiver_role=party.name,
+                    direction="backward",
+                    stage="tree",
+                    step=tree_index,
+                )
             if self.subsample >= 1.0:
                 tree_indices = np.arange(n, dtype=int)
             else:
