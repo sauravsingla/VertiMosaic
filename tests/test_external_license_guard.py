@@ -21,7 +21,9 @@ def _bundle(party: str, *, license_value: str | None = None) -> ExternalDatasetB
     )
 
 
-def test_external_fetch_stops_when_openml_license_is_unverifiable(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_external_fetch_stops_when_openml_license_is_unverifiable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     bundles = {
         "bank": _bundle("bank"),
         "telecom": _bundle("telecom"),
@@ -37,7 +39,9 @@ def test_external_fetch_stops_when_openml_license_is_unverifiable(monkeypatch: p
         external_module.prepare_external_benchmark()
 
 
-def test_external_fetch_accepts_provider_insurance_license(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_external_fetch_accepts_provider_insurance_license(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     bundles = {
         "bank": _bundle("bank"),
         "telecom": _bundle("telecom"),
