@@ -8,7 +8,7 @@ import numpy as np
 
 from vertimosaic.evaluation import entity_level_split, select_f1_threshold
 from vertimosaic.experiments.external import prepare_external_benchmark
-from vertimosaic.experiments.pipeline import slice_parties
+from vertimosaic.experiments.external_preprocessing import prepare_external_splits_locally
 from vertimosaic.models import VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
 from vertimosaic.reporting import select_sanitized_case_study
@@ -35,24 +35,30 @@ def run_distributed_signal_case_study(
         insurance_sample_size=insurance_sample_size,
     )
     split = entity_level_split(benchmark.active.labels, seed=seed)
-    train_active, train_passive = slice_parties(benchmark.active, benchmark.passive, split.train)
-    val_active, val_passive = slice_parties(benchmark.active, benchmark.passive, split.validation)
-    test_active, test_passive = slice_parties(benchmark.active, benchmark.passive, split.test)
+    prepared = prepare_external_splits_locally(benchmark, split)
+    train_active = prepared.train_active
+    train_passive = prepared.train_passive
+    val_active = prepared.validation_active
+    val_passive = prepared.validation_passive
+    test_active = prepared.test_active
+    test_passive = prepared.test_passive
 
     full_model = VFLLogisticRegression(
         learning_rate=0.08,
         max_iter=500,
         l2=1e-3,
+        early_stopping_rounds=5,
         seed=seed,
     )
-    full_model.fit(train_active, train_passive)
+    full_model.fit(train_active, train_passive, val_active, val_passive)
     bank_model = VFLLogisticRegression(
         learning_rate=0.08,
         max_iter=500,
         l2=1e-3,
+        early_stopping_rounds=5,
         seed=seed,
     )
-    bank_model.fit(train_active, [])
+    bank_model.fit(train_active, [], val_active, [])
 
     validation_probability = full_model.predict_proba([val_active, *val_passive])[:, 1]
     threshold = select_f1_threshold(val_active.labels, validation_probability)
@@ -91,6 +97,8 @@ def run_distributed_signal_case_study(
     result["benchmark_mode"] = "distributed_signal_external"
     result["cross_party_correlation"] = cross_party_correlation
     result["raw_passive_features_exposed"] = False
+    result["preprocessing_fit_scope"] = "TRAIN only, independently per party"
+    result["preprocessor_artifacts"] = prepared.preprocessor_paths
 
     output_json.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
