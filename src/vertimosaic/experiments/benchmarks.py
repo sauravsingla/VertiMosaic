@@ -16,7 +16,7 @@ def run_cpu_benchmarks(
     *,
     seed: int = 42,
     model_name: str = "logistic",
-    bootstrap_replicates: int = 100,
+    bootstrap_replicates: int = 1000,
     directory: Path = Path("benchmarks"),
     write_runs: bool = True,
     runs_root: Path = Path("runs"),
@@ -37,6 +37,7 @@ def run_cpu_benchmarks(
             {
                 "rows": size,
                 "model": model_name,
+                "bootstrap_replicates": bootstrap_replicates,
                 "data_preparation_seconds": result["data_preparation_seconds"],
                 "entity_alignment_seconds": result["entity_alignment_seconds"],
                 "preprocessing_seconds": result["preprocessing_seconds"],
@@ -62,6 +63,7 @@ def run_cpu_benchmarks(
     frame.to_csv(directory / "results.csv", index=False)
     environment = environment_snapshot(seed)
     environment["benchmark_model"] = model_name
+    environment["bootstrap_replicates"] = bootstrap_replicates
     environment["platform_python_implementation"] = platform.python_implementation()
     environment["traffic_type"] = "SIMULATED PAYLOAD SIZE"
     (directory / "environment.json").write_text(
