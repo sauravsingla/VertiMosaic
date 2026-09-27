@@ -1,15 +1,17 @@
 # VertiMosaic experiment manifest
 
-| RQ | Command | Dataset/mode | Models | Primary outputs |
-|---|---|---|---|---|
-| RQ1 | `vertimosaic external-demo` | observed/distributed external | logistic, VFLHistGBDT | `reports/external_demo.json` |
-| RQ2 | `pytest tests/test_logistic_centralized_equivalence.py` | controlled synthetic | VFL logistic vs equivalent centralized objective | test output |
-| RQ3 | `vertimosaic train --model vfl-hist-gbdt` | synthetic_scale | logistic, VFLHistGBDT | `runs/<run_id>/metrics.json` |
-| RQ4 | `vertimosaic contribution` | synthetic_scale | logistic | `results/party_contribution.csv` |
-| RQ5 | `vertimosaic overlap` | synthetic_scale | configurable | `results/partial_overlap.csv` |
-| RQ6 | `vertimosaic dropout` | synthetic_scale | logistic | `results/party_dropout.csv` |
-| RQ7 | `vertimosaic drift` | synthetic_scale | logistic | `results/feature_drift.csv` |
-| RQ8 | `vertimosaic benchmark` | synthetic_scale | configurable | `benchmarks/results.csv`, `benchmarks/environment.json` |
-| RQ9 | mode-specific commands | all four modes | applicable | run/report artifacts |
+All paper values must be generated from measured result files. No metric is manually typed into a paper table or figure.
 
-Tables and figures must be generated from result files; no metric should be manually typed into paper artifacts.
+| RQ | Command | Dataset / mode | Models | Metrics / evidence | Table | Figure | Expected output |
+|---|---|---|---|---|---|---|---|
+| RQ1: complementary cross-industry utility | `vertimosaic external-demo --mode distributed_signal_external` | distributed-signal external | VFL logistic, VFLHistGBDT, Bank-only and centralized non-federated baselines | ROC-AUC, PR-AUC, F1, Brier, calibration, paired bootstrap deltas | main results | ROC / PR / calibration | `reports/external_demo.json`; generated run metrics |
+| RQ2: centralized-objective agreement | `pytest tests/test_logistic_centralized_equivalence.py` | controlled deterministic synthetic | VFL logistic vs equivalent centralized logistic objective | loss, logits, probabilities, coefficients, ROC-AUC, PR-AUC | correctness evidence | training loss | test result; `paper/figures/training_loss.pdf` and `.png` |
+| RQ3: nonlinear vs linear VFL | `vertimosaic train --model logistic` and `vertimosaic train --model vfl-hist-gbdt` | `synthetic_scale` | VFL logistic, VFLHistGBDT | ROC-AUC, PR-AUC, F1, Brier, ECE, log loss, bootstrap CIs | `paper/tables/main_results.csv` | ROC / PR / calibration | `runs/<run_id>/metrics.json`; `paper/figures/roc_curve.*`; `pr_curve.*`; `calibration_curve.*` |
+| RQ4: predictive party utility | `vertimosaic contribution` | `synthetic_scale` | VFL logistic | leave-one-party-out delta, representation-permutation delta, exact four-party Shapley-style predictive utility | contribution result CSV | party contribution | `results/party_contribution.csv`; `paper/figures/party_contribution.pdf` and `.png` |
+| RQ5: partial entity overlap | `vertimosaic overlap` | `synthetic_scale` | configurable VFL model | coverage, ROC-AUC, PR-AUC, F1, log loss, Brier, ECE, training time, simulated payload | overlap result CSV | performance vs overlap | `results/partial_overlap.csv`; `paper/figures/performance_vs_overlap.pdf` and `.png` |
+| RQ6: unavailable parties | `vertimosaic dropout` plus missing-party study in `scripts/reproduce_paper.py` | `synthetic_scale` | VFL logistic | inference-time dropout and training/inference availability; four missing-party methods | dropout / missing-party CSVs | performance vs party dropout | `results/party_dropout.csv`; `results/missing_party_methods.csv`; `paper/figures/performance_vs_party_dropout.pdf` and `.png` |
+| RQ7: industry-specific drift | `vertimosaic drift` | `synthetic_scale` | VFL logistic | before/after ROC-AUC, PR-AUC, F1, Brier, ECE under mean, variance, missingness and categorical-frequency shifts | drift result CSV | performance vs drift | `results/feature_drift.csv`; `paper/figures/performance_vs_drift.pdf` and `.png` |
+| RQ8: CPU communication/computation cost | `vertimosaic benchmark --sizes 10000,30000,50000,100000` | `synthetic_scale` | configurable VFL model | preparation, training and inference time; peak RSS; epochs/trees; message/scalar counts; forward/backward and cumulative simulated payload | benchmark CSV | runtime / memory / communication scaling | `benchmarks/results.csv`; `benchmarks/environment.json`; `paper/figures/runtime_scaling.*`; `memory_scaling.*`; `communication_scaling.*` |
+| RQ9: conclusion sensitivity to benchmark mode | mode-specific external/synthetic commands and authorized local IEEE-CIS preparation | observed-target external, distributed-signal external, fully synthetic, genuinely linked IEEE-CIS when authorized files are supplied | applicable VFL and non-federated baselines | same held-out metrics/CIs with explicit mode, provenance and linkage interpretation | mode-specific generated results | mode-appropriate generated figures | run/report artifacts; `reports/external_demo.json`; authorized local IEEE-CIS artifacts |
+
+The publication artifact builder reads `predictions.parquet`, `training_history.csv`, experiment CSVs and benchmark CSVs to generate the paper table and figures. The repository must not substitute manually entered measurements when a required artifact is absent; missing measured inputs are treated as errors.
