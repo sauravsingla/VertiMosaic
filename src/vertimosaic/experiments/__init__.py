@@ -16,6 +16,7 @@ from vertimosaic.experiments.missing_parties import (
     prepare_missing_party_method,
     run_missing_party_methods_study,
 )
+from vertimosaic.experiments.overlap_study import run_overlap_study
 from vertimosaic.experiments.paper_artifacts import (
     build_main_results_table,
     generate_publication_artifacts,
@@ -32,7 +33,6 @@ from vertimosaic.experiments.studies import (
     run_ablation_study,
     run_drift_study,
     run_dropout_study,
-    run_overlap_study,
 )
 
 __all__ = [
