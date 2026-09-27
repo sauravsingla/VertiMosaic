@@ -19,7 +19,9 @@ class VFLLogisticRegression:
 
     Setting both ``l1`` and ``l2`` to non-zero values gives an elastic-net
     objective. Mini-batches are entity-aligned across every party and are
-    shuffled deterministically from ``seed``.
+    shuffled deterministically from ``seed``. Passive-party logit contributions
+    and residual signals cross the simulated ``Message`` transport boundary;
+    raw party feature matrices remain local.
     """
 
     learning_rate: float = 0.1
@@ -133,7 +135,7 @@ class VFLLogisticRegression:
             if party.name == active_name:
                 logits += local
             else:
-                logits += self.transport.send(
+                delivered = self.transport.send(
                     local,
                     message_type="local_logits",
                     sender_role=party.name,
@@ -142,6 +144,7 @@ class VFLLogisticRegression:
                     stage=stage,
                     step=step,
                 )
+                logits += np.asarray(delivered, dtype=float)
         return logits
 
     def fit(
@@ -206,18 +209,22 @@ class VFLLogisticRegression:
                 batch_logits = self._logits(parties, batch, stage="epoch", step=epoch)
                 batch_probs = _sigmoid(batch_logits)
                 residual = (batch_probs - y[batch]) * sample_weight[batch]
+                delivered_residuals: dict[str, np.ndarray] = {active.name: residual}
                 for party in passive:
-                    self.transport.send(
-                        residual,
-                        message_type="residual_signal",
-                        sender_role=active.name,
-                        receiver_role=party.name,
-                        direction="backward",
-                        stage="epoch",
-                        step=epoch,
+                    delivered_residuals[party.name] = np.asarray(
+                        self.transport.send(
+                            residual,
+                            message_type="residual_signal",
+                            sender_role=active.name,
+                            receiver_role=party.name,
+                            direction="backward",
+                            stage="epoch",
+                            step=epoch,
+                        ),
+                        dtype=float,
                     )
                 for party in parties:
-                    grad = party.local_gradient(residual, batch)
+                    grad = party.local_gradient(delivered_residuals[party.name], batch)
                     grad += self.l2 * self.weights_[party.name]
                     if self.gradient_clip is not None:
                         norm = float(np.linalg.norm(grad))
@@ -274,12 +281,10 @@ class VFLLogisticRegression:
         n = parties[0].n_rows
         if any(party.n_rows != n for party in parties):
             raise ValueError("inference parties must have equal row counts")
-        logits = np.full(n, self.intercept_, dtype=float)
         for party in parties:
             if party.name not in self.weights_:
                 raise ValueError(f"unknown inference party: {party.name}")
-            logits += party.local_logits(self.weights_[party.name])
-        return logits
+        return self._logits(parties, stage="inference")
 
     def predict_proba(self, parties: list[PassiveParty]) -> np.ndarray:
         probability = _sigmoid(self.decision_function(parties))
