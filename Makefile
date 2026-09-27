@@ -19,4 +19,4 @@ sbom:
 demo:
 	vertimosaic demo --rows 2000 --seed 42
 benchmark:
-	vertimosaic benchmark --sizes 10000,30000,50000,100000 --model logistic --seed 42
+	vertimosaic benchmark --sizes 10000,30000,50000,100000,250000 --model logistic --seed 42
