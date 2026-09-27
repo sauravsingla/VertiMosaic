@@ -429,7 +429,7 @@ def run_privacy_research(
                 ),
             )
 
-    gbdt_mitigations = (
+    gbdt_mitigations: tuple[tuple[str, int, int, float], ...] = (
         ("baseline", 2, max(8, baseline_rows // 80), 1.0),
         ("shallow_tree", 1, max(8, baseline_rows // 80), 1.0),
         ("large_leaf", 2, max(16, baseline_rows // 20), 1.0),
