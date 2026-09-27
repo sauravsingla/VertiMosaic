@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 import numpy as np
@@ -20,9 +20,9 @@ class ExternalBenchmark:
     linkage_manifests: dict[str, LinkageManifest]
     mode: str
     feature_frames: dict[str, pd.DataFrame]
-    source_metadata: dict[str, dict[str, Any]]
-    source_provenance: dict[str, list[FeatureProvenance]]
-    entity_alignment_seconds: float
+    source_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
+    source_provenance: dict[str, list[FeatureProvenance]] = field(default_factory=dict)
+    entity_alignment_seconds: float = 0.0
 
 
 def _numeric_matrix(frame: pd.DataFrame) -> np.ndarray:
