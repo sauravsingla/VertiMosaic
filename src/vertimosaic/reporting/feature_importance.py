@@ -83,7 +83,8 @@ def gbdt_local_feature_importance(
 
     When party objects are supplied, each owning party resolves its own opaque split
     references and computes split_count/gain_sum/gain_mean locally. The no-party fallback
-    is retained only for backward-compatible aggregate diagnostics on already fitted trees.
+    retains aggregate diagnostics from opaque feature references already present in the
+    fitted tree; numeric thresholds and raw feature values are never required.
     """
     if not model.trees_:
         raise RuntimeError("GBDT model is not fitted")
@@ -112,9 +113,9 @@ def gbdt_local_feature_importance(
         fallback_gains: dict[tuple[str, int], list[float]] = defaultdict(list)
         for tree in model.trees_:
             for node in _walk_splits(tree):
-                if node.party is None or node.feature is None:
+                if node.party is None or node.split_ref is None:
                     continue
-                fallback_gains[(node.party, node.feature)].append(node.gain)
+                fallback_gains[(node.party, node.split_ref.feature_ref)].append(node.gain)
         for (party_name, feature_index), gains in fallback_gains.items():
             gain_sum = float(np.sum(gains))
             rows_by_party[party_name].append(
