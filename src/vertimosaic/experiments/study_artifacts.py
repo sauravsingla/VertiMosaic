@@ -8,6 +8,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from vertimosaic.alignment import EntityAligner
+from vertimosaic.evaluation import communication_event_frame
+from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
 from vertimosaic.provenance import FeatureProvenance
 from vertimosaic.reproducibility import RunArtifacts
@@ -54,6 +57,63 @@ def _synthetic_feature_provenance(
                 )
             )
     return pd.DataFrame([asdict(item) for item in records])
+
+
+def prediction_frame(
+    entity_indices: np.ndarray,
+    target: np.ndarray,
+    probability: np.ndarray,
+    *,
+    seed: int,
+    condition: str,
+) -> pd.DataFrame:
+    """Create a pseudonymous per-condition prediction frame for a measured study."""
+    aligner = EntityAligner(salt=f"vertimosaic-study-{seed}")
+    return pd.DataFrame(
+        {
+            "entity_id": [aligner.pseudonymize(str(index)) for index in entity_indices],
+            "condition": condition,
+            "target": target,
+            "probability": probability,
+        }
+    )
+
+
+def model_training_frame(
+    model: VFLLogisticRegression | VFLHistGBDT,
+    *,
+    condition: str,
+) -> pd.DataFrame:
+    """Return convergence telemetry tagged with the study condition."""
+    if isinstance(model, VFLLogisticRegression):
+        frame = pd.DataFrame(
+            {"iteration": np.arange(len(model.loss_history_)), "loss": model.loss_history_}
+        )
+        if model.validation_loss_history_:
+            values = model.validation_loss_history_[: len(frame)]
+            frame.loc[: len(values) - 1, "validation_loss"] = values
+    else:
+        frame = pd.DataFrame(
+            {
+                "tree": np.arange(len(model.training_loss_history_)),
+                "training_loss": model.training_loss_history_,
+            }
+        )
+        if model.validation_loss_history_:
+            frame["validation_loss"] = model.validation_loss_history_[: len(frame)]
+    frame.insert(0, "condition", condition)
+    return frame
+
+
+def model_communication_frame(
+    model: VFLLogisticRegression | VFLHistGBDT,
+    *,
+    condition: str,
+) -> pd.DataFrame:
+    """Return metadata-only simulated communication events tagged by condition."""
+    frame = communication_event_frame(model.transport.audit_log)
+    frame.insert(0, "condition", condition)
+    return frame
 
 
 def write_synthetic_study_run(
