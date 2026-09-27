@@ -1,7 +1,13 @@
 import numpy as np
+import pytest
 
 from vertimosaic.models import VFLHistGBDT
-from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.parties import (
+    ActiveParty,
+    HistogramRoutingState,
+    OpaqueSplitReference,
+    PassiveParty,
+)
 
 
 def test_party_routing_is_local_and_deterministic() -> None:
@@ -37,6 +43,58 @@ def test_histogram_candidates_hide_numeric_threshold_and_route_by_opaque_referen
     left, right = party.route_split(np.arange(4), split_ref)
     assert len(left) + len(right) == 4
     assert set(left).isdisjoint(set(right))
+
+
+def test_histogram_routing_state_rejects_invalid_references() -> None:
+    with pytest.raises(ValueError, match="max_bins"):
+        HistogramRoutingState((np.array([0.5]),), max_bins=1)
+
+    state = HistogramRoutingState((np.array([0.5]),), max_bins=2)
+    with pytest.raises(ValueError, match="feature reference"):
+        state.threshold_for(OpaqueSplitReference(feature_ref=2, bin_ref=0))
+    with pytest.raises(ValueError, match="bin reference"):
+        state.threshold_for(OpaqueSplitReference(feature_ref=0, bin_ref=2))
+
+
+def test_party_local_histogram_guards_fail_closed() -> None:
+    party = PassiveParty("telecom", np.array([[0.0], [1.0], [2.0], [3.0]]))
+    with pytest.raises(RuntimeError, match="bins were not prepared"):
+        party.export_histogram_routing_state()
+    with pytest.raises(RuntimeError, match="routing state is unavailable"):
+        party.route_split(np.arange(4), OpaqueSplitReference(0, 0))
+    with pytest.raises(ValueError, match="out of range"):
+        party.route(np.arange(4), 3, 0.5)
+
+    assert party.candidate_histograms(
+        np.ones(4),
+        np.ones(4),
+        np.array([0]),
+        max_bins=2,
+        min_samples_leaf=1,
+    ) == []
+    with pytest.raises(ValueError, match="out-of-range feature"):
+        party.candidate_histograms(
+            np.ones(4),
+            np.ones(4),
+            np.arange(4),
+            max_bins=2,
+            min_samples_leaf=1,
+            feature_indices=np.array([4]),
+        )
+
+
+def test_party_local_importance_and_routing_state_width_guards() -> None:
+    party = PassiveParty("telecom", np.column_stack([np.arange(4), np.arange(4)]))
+    with pytest.raises(ValueError, match="feature reference"):
+        party.aggregate_local_split_importance([(OpaqueSplitReference(3, 0), 1.0)])
+
+    one_feature_state = HistogramRoutingState((np.array([0.5]),), max_bins=2)
+    with pytest.raises(ValueError, match="feature width"):
+        party.route_split(
+            np.arange(4),
+            OpaqueSplitReference(0, 0),
+            one_feature_state,
+        )
 
 
 def test_evaluation_routing_uses_training_party_histogram_state() -> None:
