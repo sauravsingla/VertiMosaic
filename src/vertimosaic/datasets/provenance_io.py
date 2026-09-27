@@ -34,14 +34,27 @@ def _source_records(bundle: ExternalDatasetBundle) -> list[dict[str, Any]]:
     registry = DatasetRegistry()
     retrieval_date = str(bundle.metadata.get("retrieval_date") or date.today().isoformat())
     runtime_license = bundle.metadata.get("license")
+    raw_rows = bundle.metadata.get("raw_rows")
+    source_raw_rows = bundle.metadata.get("source_raw_rows", {})
+    if not isinstance(source_raw_rows, dict):
+        source_raw_rows = {}
+    keys = _PARTY_REGISTRY_KEYS.get(bundle.party, ())
     records: list[dict[str, Any]] = []
-    for key in _PARTY_REGISTRY_KEYS.get(bundle.party, ()):
+    for key in keys:
         record = dict(registry.describe(key))
         record["retrieval_date"] = retrieval_date
         record["processed_rows"] = len(bundle.features)
         # Provider APIs used by the loader do not expose a stable raw-file checksum.
         # Keep the field explicit and null rather than fabricating one.
         record["checksum"] = None
+        if key in source_raw_rows:
+            record["raw_rows"] = source_raw_rows[key]
+        elif len(keys) == 1:
+            record["raw_rows"] = raw_rows
+        else:
+            # A combined multi-source row count cannot safely be assigned to either
+            # underlying source, so preserve the unknown value explicitly.
+            record["raw_rows"] = None
         if isinstance(runtime_license, str) and runtime_license.strip():
             record["license"] = runtime_license.strip()
         records.append(record)
