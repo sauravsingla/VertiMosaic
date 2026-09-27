@@ -19,7 +19,7 @@ jobs:
       - run: ruff format --check .
       - run: mypy src/vertimosaic
       - run: pytest -q --cov=vertimosaic --cov-report=term-missing
-      - run: vertimosaic demo --rows 1000 --seed 42
+      - run: vertimosaic demo --rows 2000 --seed 42
       - name: Complete CPU paper smoke pipeline
         if: matrix.python-version == '3.12'
         run: python scripts/reproduce_paper.py --smoke
