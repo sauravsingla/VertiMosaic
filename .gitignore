@@ -27,3 +27,13 @@ sbom.json
 train_transaction.csv
 train_identity.csv
 ieee-cis*/
+results/*
+!results/.gitkeep
+reports/*
+!reports/.gitkeep
+benchmarks/*
+!benchmarks/.gitkeep
+paper/figures/*
+!paper/figures/.gitkeep
+paper/tables/*
+!paper/tables/.gitkeep
