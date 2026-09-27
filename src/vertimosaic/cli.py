@@ -156,7 +156,7 @@ def train(
     model: str = typer.Option("logistic", help="logistic or vfl-hist-gbdt"),
     rows: int = typer.Option(2000, min=200),
     seed: int = 42,
-    bootstrap_replicates: int = typer.Option(100, min=10),
+    bootstrap_replicates: int = typer.Option(1000, min=10),
     write_run: bool = True,
 ) -> None:
     payload = run_synthetic_experiment(
@@ -214,11 +214,17 @@ def benchmark(
     sizes: str = typer.Option("10000,30000,50000,100000"),
     model: str = "logistic",
     seed: int = 42,
+    bootstrap_replicates: int = typer.Option(1000, min=10),
 ) -> None:
     parsed = [int(item.strip()) for item in sizes.split(",") if item.strip()]
     if any(item < 200 for item in parsed):
         raise typer.BadParameter("benchmark sizes must be at least 200")
-    frame = run_cpu_benchmarks(parsed, seed=seed, model_name=model)
+    frame = run_cpu_benchmarks(
+        parsed,
+        seed=seed,
+        model_name=model,
+        bootstrap_replicates=bootstrap_replicates,
+    )
     typer.echo(frame.to_csv(index=False))
 
 
@@ -243,6 +249,7 @@ def external_demo(
     seed: int = 42,
     cross_party_correlation: float = typer.Option(0.25, min=0.0, max=1.0),
     insurance_sample_size: int | None = typer.Option(None, min=1),
+    bootstrap_replicates: int = typer.Option(1000, min=10),
     output: Path = Path("reports/external_demo.json"),
 ) -> None:
     payload = run_external_experiment(
@@ -251,6 +258,7 @@ def external_demo(
         seed=seed,
         cross_party_correlation=cross_party_correlation,
         insurance_sample_size=insurance_sample_size,
+        bootstrap_replicates=bootstrap_replicates,
         output=output,
     )
     typer.echo(json.dumps(payload, indent=2, sort_keys=True, default=str))
