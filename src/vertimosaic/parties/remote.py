@@ -339,7 +339,9 @@ class RemotePassiveParty:
         if not isinstance(other, RemotePassiveParty):
             raise ValueError("remote routing state can only be shared with a remote partition")
         if other.name != self.name or other.n_features != self.n_features:
-            raise ValueError("remote routing state sharing requires the same party and feature width")
+            raise ValueError(
+                "remote routing state sharing requires the same party and feature width"
+            )
         source_endpoint = self.transport.endpoints.get(self.name)
         target_endpoint = other.transport.endpoints.get(other.name)
         if source_endpoint != target_endpoint:
