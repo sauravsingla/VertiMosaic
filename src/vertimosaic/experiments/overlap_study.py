@@ -115,9 +115,9 @@ def run_overlap_study(
             start = time.perf_counter()
             model.fit(train_active, train_passive)
             training_seconds = time.perf_counter() - start
-            validation_probability = model.predict_proba(
-                [validation_active, *validation_passive]
-            )[:, 1]
+            validation_probability = model.predict_proba([validation_active, *validation_passive])[
+                :, 1
+            ]
             threshold = select_f1_threshold(validation_active.labels, validation_probability)
             probability = model.predict_proba([test_active, *test_passive])[:, 1]
             metrics = binary_metrics(test_active.labels, probability, threshold=threshold)
