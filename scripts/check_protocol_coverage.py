@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any
 
 
 CRITICAL_FILES = (
@@ -19,7 +18,7 @@ CRITICAL_FILES = (
 
 
 def measured_percentages(report_path: Path) -> dict[str, float]:
-    payload: dict[str, Any] = json.loads(report_path.read_text(encoding="utf-8"))
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
     files = payload.get("files")
     if not isinstance(files, dict):
         raise ValueError("coverage report does not contain a files mapping")
