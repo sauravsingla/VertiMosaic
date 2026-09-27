@@ -1,5 +1,9 @@
 # VertiMosaic experiment manifest
 
+**Working paper title:** *VertiMosaic: CPU-Efficient Vertical Federated Learning Across Heterogeneous Industry Data*
+
+**Technical subtitle:** *A Reproducible Tabular Benchmark with External Data Grounding, Partial Entity Overlap, Party Dropout and Vertical Histogram Boosting*
+
 All paper values must be generated from measured result files. No metric is manually typed into a paper table or figure.
 
 | RQ | Command | Dataset / mode | Models | Metrics / evidence | Table | Figure | Expected output |
