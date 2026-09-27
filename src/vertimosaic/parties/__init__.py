@@ -6,6 +6,7 @@ from vertimosaic.parties.core import (
     Party,
     PassiveParty,
 )
+from vertimosaic.parties.remote import RemotePartyService, RemotePassiveParty
 
 __all__ = [
     "ActiveParty",
@@ -14,4 +15,6 @@ __all__ = [
     "OpaqueSplitReference",
     "Party",
     "PassiveParty",
+    "RemotePartyService",
+    "RemotePassiveParty",
 ]
