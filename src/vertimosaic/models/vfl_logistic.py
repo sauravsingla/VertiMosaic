@@ -64,6 +64,9 @@ class VFLLogisticRegression:
             raise ValueError("early_stopping_rounds must be positive when supplied")
         if isinstance(self.class_weight, str) and self.class_weight != "balanced":
             raise ValueError("class_weight string must be 'balanced'")
+        if isinstance(self.class_weight, dict):
+            if any(float(value) < 0.0 for value in self.class_weight.values()):
+                raise ValueError("class weights must be non-negative")
 
     def _sample_weights(self, y: np.ndarray) -> np.ndarray:
         n = len(y)
@@ -169,6 +172,8 @@ class VFLLogisticRegression:
         self.best_iteration_ = None
         y = active.labels
         sample_weight = self._sample_weights(y)
+        if not np.isfinite(sample_weight).all() or float(sample_weight.sum()) <= 0.0:
+            raise ValueError("sample weights must be finite with positive total weight")
         rng = np.random.default_rng(self.seed)
         batch_size = min(self.batch_size or n, n)
 
@@ -185,6 +190,8 @@ class VFLLogisticRegression:
                 raise ValueError("validation parties must align to the same row count")
             validation_labels = validation_active.labels
             validation_weights = self._sample_weights(validation_labels)
+            if not np.isfinite(validation_weights).all() or float(validation_weights.sum()) <= 0.0:
+                raise ValueError("validation weights must be finite with positive total weight")
 
         best_validation_loss = np.inf
         best_weights: dict[str, np.ndarray] | None = None
@@ -208,7 +215,15 @@ class VFLLogisticRegression:
                 batch = order[start : start + batch_size]
                 batch_logits = self._logits(parties, batch, stage="epoch", step=epoch)
                 batch_probs = _sigmoid(batch_logits)
-                residual = (batch_probs - y[batch]) * sample_weight[batch]
+                batch_weights = sample_weight[batch]
+                batch_weight_sum = float(batch_weights.sum())
+                if batch_weight_sum <= 0.0:
+                    raise ValueError("every optimization batch must have positive total weight")
+                residual = (batch_probs - y[batch]) * batch_weights
+                # PassiveParty.local_gradient divides by len(batch), so rescale the
+                # weighted residuals such that the resulting gradient is normalized by
+                # sum(batch_weights), exactly matching the weighted-average objective.
+                residual *= len(batch) / batch_weight_sum
                 delivered_residuals: dict[str, np.ndarray] = {active.name: residual}
                 for party in passive:
                     delivered_residuals[party.name] = np.asarray(
@@ -271,6 +286,15 @@ class VFLLogisticRegression:
             self.intercept_ = best_intercept
         elif self.best_iteration_ is None and self.n_iter_:
             self.best_iteration_ = self.n_iter_ - 1
+
+        # Ensure the final recorded training objective corresponds to the model
+        # parameters actually returned, including early-stopping restoration.
+        final_probability = _sigmoid(self._logits(parties, stage="final_training"))
+        final_loss = self._loss(y, final_probability, sample_weight)
+        if self.loss_history_:
+            self.loss_history_[-1] = final_loss
+        else:
+            self.loss_history_.append(final_loss)
         return self
 
     def decision_function(self, parties: list[PassiveParty]) -> np.ndarray:
