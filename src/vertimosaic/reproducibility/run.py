@@ -64,6 +64,13 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _json_hash(payload: Any) -> str:
+    encoded = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return sha256(encoded).hexdigest()
+
+
 @dataclass
 class RunArtifacts:
     """Writer for the reproducibility bundle required by each experiment run."""
@@ -114,22 +121,33 @@ class RunArtifacts:
         communication: pd.DataFrame,
         feature_provenance: pd.DataFrame,
     ) -> Path:
+        environment = environment_snapshot(seed)
         self.write_config(config)
         self.write_json("dataset_provenance.json", dataset_provenance)
         self.write_json("linkage_manifest.json", linkage_manifest)
-        self.write_json("environment.json", environment_snapshot(seed))
+        self.write_json("environment.json", environment)
         self.write_json("metrics.json", metrics)
         self.write_frame("predictions.parquet", predictions)
         self.write_frame("training_history.csv", training_history)
         self.write_frame("communication.csv", communication)
         self.write_frame("feature_provenance.csv", feature_provenance)
         config_bytes = yaml.safe_dump(config, sort_keys=True).encode("utf-8")
+        artifact_hashes = {
+            item.name: file_sha256(item)
+            for item in sorted(self.directory.iterdir())
+            if item.is_file() and item.name != "run_manifest.json"
+        }
+        dataset_hashes = dataset_provenance.get("dataset_hashes", {})
         manifest = {
             "run_id": self.run_id,
             "created_at": datetime.now(UTC).isoformat(),
             "seed": seed,
             "git_sha": _git_sha(),
             "configuration_hash": sha256(config_bytes).hexdigest(),
+            "dataset_provenance_hash": _json_hash(dataset_provenance),
+            "dataset_hashes": dataset_hashes if isinstance(dataset_hashes, dict) else {},
+            "dependency_versions": environment["dependency_versions"],
+            "artifact_sha256": artifact_hashes,
             "files": sorted(item.name for item in self.directory.iterdir()),
         }
         self.write_json("run_manifest.json", manifest)
