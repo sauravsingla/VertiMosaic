@@ -1,0 +1,60 @@
+name: Publish VertiMosaic Hugging Face Space
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'hf-space/**'
+      - 'huggingface/build_space.py'
+      - 'src/vertimosaic/experiments/**'
+      - 'src/vertimosaic/datasets/synthetic.py'
+      - 'src/vertimosaic/models/**'
+      - 'src/vertimosaic/evaluation/**'
+      - 'src/vertimosaic/parties/**'
+      - 'src/vertimosaic/privacy/**'
+      - '.github/workflows/publish-space.yml'
+      - 'pyproject.toml'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish-space:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install VertiMosaic
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Build Space evidence payload
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          python huggingface/build_space.py --output hf-space/data.json
+          test -s hf-space/data.json
+
+      - name: Install Hugging Face CLI
+        run: |
+          curl -LsSf https://hf.co/cli/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Publish Space to Hugging Face
+        env:
+          HF_OIDC_RESOURCE: spaces/sauravsingla08/VertiMosaic
+        run: |
+          hf upload spaces/sauravsingla08/VertiMosaic hf-space . \
+            --commit-message "Sync VertiMosaic Space from GitHub ${GITHUB_SHA::7}"
