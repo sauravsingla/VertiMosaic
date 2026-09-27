@@ -124,7 +124,11 @@ def residual_label_inference(
     exposed = ~ambiguous
     prediction = (values < 0.0).astype(int)
     exposed_count = int(exposed.sum())
-    accuracy = float(np.mean(prediction[exposed] == target[exposed])) if exposed_count else float("nan")
+    accuracy = (
+        float(np.mean(prediction[exposed] == target[exposed]))
+        if exposed_count
+        else float("nan")
+    )
     return ResidualLabelInferenceResult(
         accuracy=accuracy,
         exposed_count=exposed_count,
