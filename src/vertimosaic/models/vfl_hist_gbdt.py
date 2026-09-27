@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.parties.core import HistogramCandidate, OpaqueSplitReference
 from vertimosaic.transport import InMemoryTransport
 
 
@@ -26,7 +27,7 @@ class TreeNode:
     value: float = 0.0
     party: str | None = None
     feature: int | None = None
-    threshold: float | None = None
+    split_ref: OpaqueSplitReference | None = None
     gain: float = 0.0
     left: TreeNode | None = None
     right: TreeNode | None = None
@@ -40,11 +41,13 @@ class TreeNode:
 class VFLHistGBDT:
     """CPU vertical histogram gradient boosting research implementation.
 
-    Passive parties compute histogram candidates locally and expose aggregate
-    gradient/Hessian/count statistics plus the derived split metadata required by
-    this in-process simulator. Raw passive feature matrices and feature names remain
-    party-local, but numeric split thresholds and routing metadata are not
-    cryptographically hidden. See the threat-model documentation for this boundary.
+    Passive parties compute histogram candidates locally and expose only aggregate
+    gradient/Hessian/count statistics plus opaque party-local feature/bin split
+    references. The owning party applies selected splits locally. Raw passive feature
+    matrices, feature names, and numeric split thresholds are not part of the
+    coordinator-facing candidate metadata. This in-process simulator still does not
+    provide cryptographic confidentiality: gradients, Hessians, opaque references and
+    routing information can leak information. See the threat-model documentation.
     """
 
     n_estimators: int = 20
@@ -96,11 +99,11 @@ class VFLHistGBDT:
     def _gain(g: float, h: float, reg: float) -> float:
         return (g * g) / (h + reg)
 
-    def _split_gain(self, cand: dict[str, float | int]) -> float:
-        gl = float(cand["g_left"])
-        hl = float(cand["h_left"])
-        gr = float(cand["g_right"])
-        hr = float(cand["h_right"])
+    def _split_gain(self, cand: HistogramCandidate) -> float:
+        gl = cand["g_left"]
+        hl = cand["h_left"]
+        gr = cand["g_right"]
+        hr = cand["h_right"]
         if hl < self.min_child_weight or hr < self.min_child_weight:
             return -np.inf
         return 0.5 * (
@@ -142,7 +145,7 @@ class VFLHistGBDT:
             return node
         active_name = next(iter(parties))
         best_gain = 0.0
-        best: tuple[PassiveParty, dict[str, float | int]] | None = None
+        best: tuple[PassiveParty, HistogramCandidate] | None = None
         for party in parties.values():
             feature_indices = self._feature_indices(party, rng)
             candidates = party.candidate_histograms(
@@ -155,7 +158,7 @@ class VFLHistGBDT:
             )
             if party.name != active_name:
                 self.transport.send(
-                    np.empty((len(candidates), 6), dtype=float),
+                    np.empty((len(candidates), 8), dtype=float),
                     message_type="candidate_histogram_metadata",
                     sender_role=party.name,
                     receiver_role=active_name,
@@ -171,9 +174,9 @@ class VFLHistGBDT:
         if best is None:
             return node
         party, cand = best
-        feature = int(cand["feature"])
-        threshold = float(cand["threshold"])
-        left_idx, right_idx = party.route(indices, feature, threshold)
+        split_ref = cand["split_ref"]
+        feature = split_ref.feature_ref
+        left_idx, right_idx = party.route_split(indices, split_ref)
         if party.name != active_name:
             self.transport.send(
                 np.asarray([len(left_idx), len(right_idx)]),
@@ -188,7 +191,7 @@ class VFLHistGBDT:
             return node
         node.party = party.name
         node.feature = feature
-        node.threshold = threshold
+        node.split_ref = split_ref
         node.gain = float(best_gain)
         leaf_count[0] += 1
         node.left = self._build_node(
@@ -222,14 +225,14 @@ class VFLHistGBDT:
             if node.is_leaf:
                 out[idx] = node.value
                 return
-            if node.party is None or node.feature is None or node.threshold is None:
+            if node.party is None or node.feature is None or node.split_ref is None:
                 raise RuntimeError("non-leaf node is missing split metadata")
             if node.party not in parties:
                 if self.missing_party_policy == "zero_contribution":
                     out[idx] = 0.0
                     return
                 raise ValueError(f"missing split-owning party for inference: {node.party}")
-            left_idx, right_idx = parties[node.party].route(idx, node.feature, node.threshold)
+            left_idx, right_idx = parties[node.party].route_split(idx, node.split_ref)
             if node.left is None or node.right is None:
                 raise RuntimeError("non-leaf node is missing child nodes")
             walk(node.left, left_idx)
