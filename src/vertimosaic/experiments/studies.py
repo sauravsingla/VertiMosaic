@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
 import time
@@ -45,6 +46,18 @@ def _passive_map(items: list[PassiveParty]) -> dict[str, PassiveParty]:
     return {item.name: item for item in items}
 
 
+def _share_gbdt_evaluation_state(
+    model: VFLLogisticRegression | VFLHistGBDT,
+    training_parties: list[PassiveParty],
+    evaluation_parties: list[PassiveParty],
+) -> None:
+    """Explicitly transfer party-local train bins to same-party evaluation objects."""
+    if not isinstance(model, VFLHistGBDT):
+        return
+    for source_party, target_party in zip(training_parties, evaluation_parties, strict=True):
+        source_party.share_histogram_routing_state_with(target_party)
+
+
 def run_ablation_study(
     *,
     rows: int = 1200,
@@ -72,6 +85,11 @@ def run_ablation_study(
             selected_test = [test_map[name] for name in subset]
             start = time.perf_counter()
             model.fit(train_active, selected_train)
+            _share_gbdt_evaluation_state(
+                model,
+                [train_active, *selected_train],
+                [test_active, *selected_test],
+            )
             training_seconds = time.perf_counter() - start
             probability = model.predict_proba([test_active, *selected_test])[:, 1]
             metrics = binary_metrics(test_active.labels, probability)
