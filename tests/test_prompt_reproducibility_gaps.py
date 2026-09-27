@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 import vertimosaic.datasets.external as external_datasets
+import vertimosaic.reproducibility.run as run_module
 from vertimosaic.datasets import ExternalDatasetBundle
 from vertimosaic.experiments.external_run import run_external_experiment
 from vertimosaic.provenance import FeatureProvenance
@@ -32,19 +33,28 @@ def _bundle(
         )
         for column in frame.columns
     ]
+    keys = {
+        "bank": ("bank",),
+        "telecom": ("telecom",),
+        "insurance": ("insurance_freq", "insurance_sev"),
+        "retail": ("retail",),
+    }[party]
     metadata: dict[str, object] = {
         "license": "test-license",
         "processed_rows": len(frame),
         "retrieval_date": "2026-09-27",
+        "raw_rows": len(frame),
+        "source_raw_rows": {key: len(frame) for key in keys},
+        "source_checksums": {
+            key: f"{index + 1:064x}" for index, key in enumerate(keys)
+        },
+        "source_checksum_algorithm": "sha256",
+        "source_checksum_scope": "test-retrieved-frame",
     }
     if party == "insurance":
         metadata["source_licenses"] = {
             "insurance_freq": "test-license-frequency",
             "insurance_sev": "test-license-severity",
-        }
-        metadata["source_raw_rows"] = {
-            "insurance_freq": len(frame),
-            "insurance_sev": len(frame),
         }
     return ExternalDatasetBundle(
         party=party,
@@ -114,6 +124,7 @@ def test_external_experiment_writes_complete_reproducibility_bundle(
         "test-license-frequency",
         "test-license-severity",
     ]
+    assert all(len(source["checksum"]) == 64 for source in insurance_sources)
 
 
 def test_retail_fetch_applies_source_time_cutoff_before_customer_aggregation(monkeypatch) -> None:
@@ -143,6 +154,9 @@ def test_retail_fetch_applies_source_time_cutoff_before_customer_aggregation(mon
     )
     assert float(bundle.features["total_spend"].max()) == 20.0
     assert all("at or before 2020-01-03" in item.transformation for item in bundle.provenance)
+    checksum = bundle.metadata["source_checksums"]
+    assert isinstance(checksum, dict)
+    assert len(str(checksum["retail"])) == 64
 
 
 def test_run_artifact_ids_do_not_collide_within_same_second(tmp_path: Path) -> None:
@@ -151,3 +165,19 @@ def test_run_artifact_ids_do_not_collide_within_same_second(tmp_path: Path) -> N
     assert first.run_id != second.run_id
     assert first.directory.exists()
     assert second.directory.exists()
+
+
+def test_environment_snapshot_reads_git_sha_from_local_repository(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    sha = "a" * 40
+    refs = tmp_path / ".git" / "refs" / "heads"
+    refs.mkdir(parents=True)
+    (tmp_path / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (refs / "main").write_text(f"{sha}\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+    monkeypatch.delenv("VERTIMOSAIC_GIT_SHA", raising=False)
+
+    assert run_module.environment_snapshot(42)["git_sha"] == sha
