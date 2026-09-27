@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -21,6 +22,7 @@ class ExternalBenchmark:
     feature_frames: dict[str, pd.DataFrame]
     source_metadata: dict[str, dict[str, Any]]
     source_provenance: dict[str, list[FeatureProvenance]]
+    entity_alignment_seconds: float
 
 
 def _numeric_matrix(frame: pd.DataFrame) -> np.ndarray:
@@ -120,6 +122,7 @@ def prepare_external_benchmark(
     linked_frames: dict[str, pd.DataFrame] = {}
     linked_matrices: dict[str, np.ndarray] = {}
     manifests: dict[str, LinkageManifest] = {}
+    alignment_start = time.perf_counter()
     for offset, name in enumerate(("telecom", "insurance", "retail"), start=1):
         linked_frames[name], linked_matrices[name], manifests[name] = _link_passive(
             bank_matrix,
@@ -127,6 +130,7 @@ def prepare_external_benchmark(
             correlation=cross_party_correlation,
             seed=seed + offset,
         )
+    entity_alignment_seconds = time.perf_counter() - alignment_start
 
     if mode == "observed_target_external":
         y = observed_target
@@ -166,6 +170,7 @@ def prepare_external_benchmark(
         feature_frames=feature_frames,
         source_metadata={name: dict(bundle.metadata) for name, bundle in bundles.items()},
         source_provenance={name: list(bundle.provenance) for name, bundle in bundles.items()},
+        entity_alignment_seconds=entity_alignment_seconds,
     )
 
 
