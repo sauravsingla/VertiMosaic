@@ -3,9 +3,6 @@ name: Publish VertiMosaic to PyPI
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - '.github/workflows/publish-pypi.yml'
     tags:
       - 'v*'
 
@@ -84,14 +81,14 @@ jobs:
           cat > /tmp/release-notes.md <<EOF
           ## VertiMosaic ${TAG}
 
-          First public PyPI release of VertiMosaic, a CPU-first vertical federated learning research framework for heterogeneous tabular data.
+          PyPI release of VertiMosaic, a CPU-first vertical federated learning research framework for heterogeneous tabular data.
 
           - Install: \`pip install vertimosaic\`
           - Hugging Face Dataset: https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark
           - Hugging Face Space: https://huggingface.co/spaces/sauravsingla08/VertiMosaic
           - Source: https://github.com/sauravsingla/VertiMosaic
 
-          The GitHub release is intentionally created after a successful PyPI publication so a connected Zenodo repository can archive the released source version.
+          The GitHub release is created after successful PyPI publication so a connected Zenodo repository can archive the released source version.
           EOF
           gh release create "$TAG" \
             --target "$GITHUB_SHA" \
