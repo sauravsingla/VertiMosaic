@@ -16,7 +16,10 @@ from vertimosaic.transport import (
 )
 
 
-def _start_server(role: str, token: str | None = None) -> tuple[ReferenceRelayServer, threading.Thread, str]:
+def _start_server(
+    role: str,
+    token: str | None = None,
+) -> tuple[ReferenceRelayServer, threading.Thread, str]:
     server = ReferenceRelayServer(("127.0.0.1", 0), receiver_role=role, bearer_token=token)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
