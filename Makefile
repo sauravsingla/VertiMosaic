@@ -4,16 +4,9 @@
 test:
 	pytest -q
 coverage:
-	pytest -q --cov=vertimosaic --cov-report=term-missing --cov-report=xml:coverage.xml
+	pytest -q --cov=vertimosaic --cov-report=term-missing --cov-report=xml:coverage.xml --cov-report=json:coverage.json
 coverage-protocol:
-	pytest -q \
-		--cov=vertimosaic.models.vfl_logistic \
-		--cov=vertimosaic.models.vfl_hist_gbdt \
-		--cov=vertimosaic.parties.core \
-		--cov=vertimosaic.transport \
-		--cov-branch \
-		--cov-report=term-missing \
-		--cov-fail-under=90
+	python scripts/check_protocol_coverage.py --coverage coverage.json --threshold 90
 lint:
 	ruff check .
 type:
