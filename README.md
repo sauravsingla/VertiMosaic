@@ -1,7 +1,7 @@
 <h1 align="center">VertiMosaic</h1>
 
 <p align="center">
-  <b>CPU-Only Cross-Industry Vertical Federated Learning for Tabular Data</b>
+  <b>Cross-Industry Vertical Federated Learning for Tabular Data</b>
 </p>
 
 <p align="center">
@@ -14,17 +14,16 @@
   <a href="https://github.com/sauravsingla/VertiMosaic/actions/workflows/package.yml"><img src="https://github.com/sauravsingla/VertiMosaic/actions/workflows/package.yml/badge.svg?branch=main" alt="Package"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue" alt="Python 3.11 | 3.12">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0"></a>
-  <img src="https://img.shields.io/badge/Compute-CPU--Only-success" alt="CPU Only">
 </p>
 
 VertiMosaic is an open-source research framework for **vertical federated learning (VFL)** on heterogeneous tabular data. It is designed for experiments in which different organizations own different feature columns for the same or overlapping entities and raw passive-party feature matrices are not pooled into the active party.
 
-The framework emphasizes **scientific reproducibility, explicit privacy boundaries, source provenance, communication auditing, and CPU-friendly reference implementations**. It deliberately distinguishes raw-feature locality and pseudonymization from stronger cryptographic privacy guarantees.
+The framework emphasizes **scientific reproducibility, explicit privacy boundaries, source provenance, communication auditing, and efficient reference implementations**. It deliberately distinguishes raw-feature locality and pseudonymization from stronger cryptographic privacy guarantees.
 
 ### Highlights
 
 - **True vertical partitioning:** Bank is the active party and owns the binary target; Telecom, Insurance, and Retail contribute complementary feature columns through party-local computations.
-- **CPU-first reference algorithms:** first-principles NumPy/scikit-learn ecosystem with no GPU requirement.
+- **Reference algorithms:** first-principles NumPy/scikit-learn ecosystem with no GPU requirement.
 - **Two VFL model families:** `VFLLogisticRegression` and `VFLHistGBDT`.
 - **Cross-industry research benchmark:** externally grounded, semi-synthetic linkage across public source domains.
 - **Optional genuinely linked benchmark:** authorized local IEEE-CIS transaction/identity files joined by exact `TransactionID` intersection.
@@ -176,7 +175,6 @@ VertiMosaic models **column-partitioned learning**. Federated model code request
 |---|---|
 | Federation type | Vertical Federated Learning |
 | Raw feature tables pooled | No |
-| CPU supported | Yes |
 | GPU required | No |
 | Graph ML required | No |
 | External real-world datasets | Yes |
@@ -198,7 +196,7 @@ A first-principles NumPy reference protocol. Each party computes local logits an
 
 ### `VFLHistGBDT`
 
-A CPU vertical histogram-gradient-boosting research implementation in which parties compute local candidate statistics and the owning party performs routing.
+A vertical histogram-gradient-boosting research implementation in which parties compute local candidate statistics and the owning party performs routing.
 
 Centralized models exist only as **NON-FEDERATED BASELINES** for research comparison and are never relabelled as VFL.
 
@@ -293,8 +291,7 @@ Detailed design and research notes are available in:
 If you use VertiMosaic in research or development, please cite the software using the repository's [`CITATION.cff`](CITATION.cff):
 
 ```text
-VertiMosaic: CPU-Only Cross-Industry Vertical Federated Learning for
-Privacy-Constrained Tabular Machine Learning
+VertiMosaic
 Saurav Singla
 Version 0.1.0
 Apache-2.0
