@@ -44,9 +44,24 @@ def comparison_observation(comparison: dict[str, Any]) -> str:
     missing = required - comparison.keys()
     if missing:
         raise ValueError(f"comparison is missing fields: {sorted(missing)}")
-    return interpret_delta(
-        str(comparison["metric"]),
-        float(comparison["delta"]),
-        float(comparison["lower"]),
-        float(comparison["upper"]),
-    )
+    observations = [
+        interpret_delta(
+            str(comparison["metric"]),
+            float(comparison["delta"]),
+            float(comparison["lower"]),
+            float(comparison["upper"]),
+        )
+    ]
+    secondary_delta = comparison.get("paired_pr_auc_delta")
+    secondary_lower = comparison.get("paired_pr_auc_lower")
+    secondary_upper = comparison.get("paired_pr_auc_upper")
+    if secondary_delta is not None and secondary_lower is not None and secondary_upper is not None:
+        observations.append(
+            interpret_delta(
+                "pr_auc",
+                float(secondary_delta),
+                float(secondary_lower),
+                float(secondary_upper),
+            )
+        )
+    return " ".join(observations)

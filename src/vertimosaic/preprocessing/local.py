@@ -23,6 +23,12 @@ class LocalTabularPreprocessor:
     transformer_: ColumnTransformer | None = field(default=None, init=False)
     lower_bounds_: pd.Series | None = field(default=None, init=False)
     upper_bounds_: pd.Series | None = field(default=None, init=False)
+    quantile_bin_edges_: dict[str, np.ndarray] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+    )
+    quantile_bin_count_: int | None = field(default=None, init=False, repr=False)
 
     def _validate(self) -> None:
         if self.scaling not in {"robust", "standard", "none"}:
@@ -83,6 +89,58 @@ class LocalTabularPreprocessor:
 
     def fit_transform(self, frame: pd.DataFrame) -> np.ndarray:
         return self.fit(frame).transform(frame)
+
+    def fit_quantile_bins(
+        self,
+        frame: pd.DataFrame,
+        *,
+        max_bins: int = 16,
+    ) -> LocalTabularPreprocessor:
+        """Fit party-local numeric quantile bins using only the supplied training frame.
+
+        The learned cut points remain inside this party preprocessor. Missing values are
+        assigned to a dedicated final bin during transformation. This helper is intended
+        for local tree-model preprocessing and never pools quantiles across parties.
+        """
+        self._validate()
+        if max_bins < 2:
+            raise ValueError("max_bins must be at least 2")
+        missing = set(self.numeric_columns) - set(frame.columns)
+        if missing:
+            raise ValueError(f"missing preprocessing columns: {sorted(missing)}")
+        if self.winsor_quantile is not None and self.lower_bounds_ is None:
+            self._winsor_fit(frame)
+        local = self._winsor_apply(frame)
+        quantiles = np.linspace(0.0, 1.0, max_bins + 1)[1:-1]
+        edges: dict[str, np.ndarray] = {}
+        for column in self.numeric_columns:
+            values = pd.to_numeric(local[column], errors="coerce").to_numpy(dtype=float)
+            finite = values[np.isfinite(values)]
+            edges[column] = (
+                np.unique(np.quantile(finite, quantiles)).astype(float)
+                if finite.size and quantiles.size
+                else np.empty(0, dtype=float)
+            )
+        self.quantile_bin_edges_ = edges
+        self.quantile_bin_count_ = max_bins
+        return self
+
+    def transform_quantile_bins(self, frame: pd.DataFrame) -> np.ndarray:
+        """Apply previously fitted party-local quantile bins to numeric columns."""
+        if self.quantile_bin_count_ is None:
+            raise RuntimeError("quantile bins are not fitted")
+        missing = set(self.numeric_columns) - set(frame.columns)
+        if missing:
+            raise ValueError(f"missing preprocessing columns: {sorted(missing)}")
+        local = self._winsor_apply(frame)
+        output = np.zeros((len(local), len(self.numeric_columns)), dtype=np.int32)
+        for column_index, column in enumerate(self.numeric_columns):
+            edges = self.quantile_bin_edges_[column]
+            values = pd.to_numeric(local[column], errors="coerce").to_numpy(dtype=float)
+            codes = np.searchsorted(edges, values, side="left").astype(np.int32)
+            codes[~np.isfinite(values)] = len(edges)
+            output[:, column_index] = codes
+        return output
 
     def output_feature_metadata(self) -> list[dict[str, str]]:
         """Describe each transformed column without exposing any row-level values."""

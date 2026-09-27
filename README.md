@@ -36,7 +36,7 @@ The framework emphasizes **scientific reproducibility, explicit privacy boundari
   <img src="assets/vertimosaic-architecture.svg" alt="Animated VertiMosaic architecture" width="100%">
 </p>
 
-The animation reflects the current reference protocols. Raw feature matrices stay party-local. `VFLLogisticRegression` uses local logits and residual signals with party-local gradient computation, while `VFLHistGBDT` uses gradients, Hessians, local histogram candidates, aggregate candidate metadata, and party-local split routing. `InMemoryTransport` records communication metadata for the in-process research simulator; it is not a cryptographic transport layer.
+The animation reflects the current reference protocols. Raw feature matrices stay party-local. `VFLLogisticRegression` uses local logits and residual signals with party-local gradient computation. `VFLHistGBDT` sends target-derived gradients and Hessians, computes histogram candidates from retained party-local training bins, exposes only aggregate candidate statistics plus opaque feature/bin references, and applies selected splits inside the owning party. Numeric split thresholds stay party-local. `InMemoryTransport` records communication metadata for the in-process research simulator; it is not a cryptographic transport layer.
 
 ## Table of Contents
 
@@ -47,6 +47,7 @@ The animation reflects the current reference protocols. Raw feature matrices sta
 - [Framework Overview](#bulb-framework-overview)
 - [Reference Algorithms](#gear-reference-algorithms)
 - [Benchmark Modes](#test_tube-benchmark-modes)
+- [Partial Entity Overlap](#partial-entity-overlap)
 - [Privacy Boundary](#lock-privacy-boundary)
 - [External Data and Provenance](#card_file_box-external-data-and-provenance)
 - [Evaluation and Reproducibility](#bar_chart-evaluation-and-reproducibility)
@@ -99,7 +100,8 @@ vertimosaic contribution
 vertimosaic overlap
 vertimosaic dropout
 vertimosaic drift
-vertimosaic benchmark
+vertimosaic benchmark --mode synthetic_scale --sizes 10000,30000,50000,100000,250000
+vertimosaic benchmark --mode observed_target_external --model vfl-hist-gbdt
 vertimosaic report
 vertimosaic external-demo --model vfl-hist-gbdt --seed 42
 ```
@@ -135,6 +137,7 @@ VertiMosaic is organized around a small set of research components:
 - **Party objects:** hold local feature matrices and perform party-local preprocessing/computation.
 - **Active party:** Bank owns the binary target and coordinates target-dependent training steps.
 - **Passive parties:** Telecom, Insurance, and Retail own complementary feature columns.
+- **Local preprocessing:** median imputation, robust/standard scaling, categorical imputation, one-hot encoding with unknown-category handling, configurable winsorization, and train-only local quantile binning.
 - **Linkage layer:** builds aligned research populations while preserving the distinction between real source data and semi-synthetic cross-domain linkage.
 - **VFL protocols:** logistic regression and histogram-gradient-boosting reference implementations.
 - **Communication simulator:** `InMemoryTransport` records message metadata such as type, sender/receiver roles, shapes, scalar counts, and estimated bytes without retaining transmitted array values.
@@ -192,13 +195,13 @@ The four primary public sources do **not** describe the same real people. The fo
 
 ### `VFLLogisticRegression`
 
-A first-principles NumPy reference protocol. Each party computes local logits and local gradients over only its own features.
+A first-principles NumPy reference protocol. Each party computes local logits and local gradients over only its own features. Passive logits and residual signals use the explicit `Message`/`InMemoryTransport` path rather than bypassing the communication abstraction.
 
 ### `VFLHistGBDT`
 
-A vertical histogram-gradient-boosting research implementation in which parties compute local candidate statistics and the owning party performs routing.
+A vertical histogram-gradient-boosting research implementation. Every party fits and retains its own training-derived quantile-bin representation. Passive parties receive the required target-derived gradient/Hessian signals, compute local aggregate histogram candidates, and send aggregate gradient/Hessian/count statistics plus opaque feature/bin references. The active party selects a split; the owning party resolves its private numeric threshold and performs routing locally. Validation and test rows reuse the training-derived local routing state rather than refitting held-out bins.
 
-Centralized models exist only as **NON-FEDERATED BASELINES** for research comparison and are never relabelled as VFL.
+Centralized models exist only as **NON-FEDERATED BASELINES** for research comparison and are never relabelled as VFL. The centralized baseline API explicitly supports every Bank-anchored party subset as well as Bank-only and all-party comparisons for logistic and histogram-gradient-boosting models.
 
 ## :test_tube: Benchmark Modes
 
@@ -206,6 +209,12 @@ Centralized models exist only as **NON-FEDERATED BASELINES** for research compar
 - **`distributed_signal_external`** — real transformed source-domain features are linked first, then a clearly disclosed semi-synthetic target depends on all four parties.
 - **`synthetic_scale`** — fully controlled scaling, overlap, dropout, drift, noise, and distributed-signal experiments.
 - **`ieee_cis_linked`** — optional genuinely linked two-party VFL benchmark using authorized local IEEE-CIS transaction and identity files joined by `TransactionID`; restricted source files are never downloaded, committed, or redistributed by VertiMosaic.
+
+Synthetic scaling uses the full **10K / 30K / 50K / 100K / 250K** grid. External benchmarking runs at the **actual available Bank anchor size** and records preparation, alignment, training, inference, memory, communication, and metric fields in `benchmarks/results.csv`; it does not invent an external row count.
+
+## Partial Entity Overlap
+
+`vertimosaic overlap` evaluates **100%, 90%, 75%, 50%, and 25%** controlled Bank-to-passive overlap. The same deterministic availability realization and the same global train/validation/test entity split are used to compare `intersection_only` against missing-party-aware `availability_indicator` training. The output records both retained coverage and true common-intersection coverage, selects F1 thresholds using validation predictions only, and reports the required performance and communication fields separately for each strategy.
 
 ## :lock: Privacy Boundary
 
@@ -256,6 +265,8 @@ Dataset licensing remains separate from the Apache-2.0 source-code license; see 
 
 Each retrieved source capture records a SHA-256 content checksum before transformation, sampling, or temporal cutoff as applicable, plus raw/processed row counts and per-source license metadata. Processed feature artifacts have a separately scoped SHA-256 checksum; source-capture hashes are not presented as provider-published file checksums.
 
+TRAIN-fitted party preprocessors are persisted for external experiments so validation and test transformations reuse the learned local preprocessing state rather than fitting on held-out rows.
+
 ## :bar_chart: Evaluation and Reproducibility
 
 Entity-level splits default to **70% train / 15% validation / 15% test**. Threshold selection uses validation data only.
@@ -270,7 +281,7 @@ Test evaluation supports:
 - deterministic bootstrap intervals
 - paired bootstrap differences
 
-Normal research runs use **1,000 deterministic bootstrap replicates** where practical; smoke CI uses **100**. No benchmark conclusion is hard-coded. Negative and uncertain findings are retained. Communication quantities are **simulated payload estimates**, not measured network traffic or latency.
+Normal research runs use **1,000 deterministic bootstrap replicates** where practical; smoke CI uses **100**. Important baseline comparisons report both ROC-AUC and PR-AUC paired deltas with 95% intervals from the same paired resamples. No benchmark conclusion is hard-coded. Negative and uncertain findings are retained. Communication quantities are **simulated payload estimates**, not measured network traffic or latency.
 
 Every experiment run bundle records `config.yaml`, dataset/linkage provenance, environment and dependency versions, measured metrics, predictions, training history, communication metadata, feature provenance, artifact hashes, configuration hash, timestamps, seed, and Git SHA under `runs/<run_id>/`.
 

@@ -135,9 +135,17 @@ def save_scaling_plot(
     y: str,
     title: str,
     output_stem: Path,
+    series: str | None = None,
 ) -> tuple[Path, Path]:
     fig, ax = plt.subplots()
-    ax.plot(frame[x], frame[y], marker="o")
+    if series is not None and series in frame.columns:
+        for label, group in frame.groupby(series, sort=True):
+            ordered = group.sort_values(x)
+            ax.plot(ordered[x], ordered[y], marker="o", label=str(label))
+        ax.legend(title=series)
+    else:
+        ordered = frame.sort_values(x)
+        ax.plot(ordered[x], ordered[y], marker="o")
     ax.set_xlabel(x)
     ax.set_ylabel(y)
     ax.set_title(title)

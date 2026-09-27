@@ -118,7 +118,7 @@
   <text x="860" y="439" class="small">• Gradients + Hessians → passive parties</text>
   <text x="860" y="466" class="small">• Local histogram candidates</text>
   <text x="860" y="493" class="small">• Aggregate candidate metadata → active party</text>
-  <text x="860" y="520" class="small">• Opaque threshold + local routing</text>
+  <text x="860" y="520" class="small">• Opaque feature/bin + local routing</text>
   <text x="860" y="547" class="small">• Raw feature matrices stay local</text>
 
   <path id="tIn" d="M300 315 C360 315 385 325 430 330" class="neutralPath"/>

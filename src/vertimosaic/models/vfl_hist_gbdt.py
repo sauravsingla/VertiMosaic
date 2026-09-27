@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.parties import ActiveParty, HistogramRoutingState, PassiveParty
 from vertimosaic.parties.core import HistogramCandidate, OpaqueSplitReference
-from vertimosaic.transport import InMemoryTransport
+from vertimosaic.transport import InMemoryTransport, StructuredPayload
 
 
 def _sigmoid(x: np.ndarray) -> np.ndarray:
@@ -26,7 +26,6 @@ class TreeNode:
     depth: int
     value: float = 0.0
     party: str | None = None
-    feature: int | None = None
     split_ref: OpaqueSplitReference | None = None
     gain: float = 0.0
     left: TreeNode | None = None
@@ -41,13 +40,17 @@ class TreeNode:
 class VFLHistGBDT:
     """CPU vertical histogram gradient boosting research implementation.
 
-    Passive parties compute histogram candidates locally and expose only aggregate
-    gradient/Hessian/count statistics plus opaque party-local feature/bin split
-    references. The owning party applies selected splits locally. Raw passive feature
-    matrices, feature names, and numeric split thresholds are not part of the
-    coordinator-facing candidate metadata. This in-process simulator still does not
-    provide cryptographic confidentiality: gradients, Hessians, opaque references and
-    routing information can leak information. See the threat-model documentation.
+    Passive parties receive target-derived gradient/Hessian signals through the
+    simulated transport, build histograms from retained local bins, and send only
+    aggregate split statistics plus opaque feature/bin references back through
+    ``Message`` objects. The active party sends node membership and selected opaque
+    references through the same transport; the split-owning party resolves its private
+    threshold state, performs routing locally, and returns only aligned partition
+    indices. The model retains only token-only routing handles, never numeric thresholds.
+
+    This in-process simulator is not cryptographically secure: gradients, Hessians,
+    node membership, opaque references, and routing information can leak information.
+    See the threat-model documentation.
     """
 
     n_estimators: int = 20
@@ -70,6 +73,11 @@ class VFLHistGBDT:
     training_loss_history_: list[float] = field(default_factory=list, init=False)
     validation_loss_history_: list[float] = field(default_factory=list, init=False)
     best_iteration_: int | None = field(default=None, init=False)
+    _routing_states: dict[str, HistogramRoutingState] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+    )
 
     def _validate_hyperparameters(self) -> None:
         if self.n_estimators <= 0:
@@ -123,11 +131,92 @@ class VFLHistGBDT:
         count = max(1, int(np.ceil(party.n_features * self.feature_subsample)))
         return np.sort(rng.choice(party.n_features, size=count, replace=False)).astype(int)
 
+    @staticmethod
+    def _candidate_payload(candidates: list[HistogramCandidate]) -> StructuredPayload:
+        # Per candidate: 2 opaque integer refs + 4 gradient/Hessian sums + 2 counts.
+        scalar_count = len(candidates) * 8
+        return StructuredPayload(
+            value=candidates,
+            shape=(len(candidates), 8),
+            scalar_count=scalar_count,
+            estimated_bytes=scalar_count * 8,
+        )
+
+    @staticmethod
+    def _routing_payload(
+        left_idx: np.ndarray,
+        right_idx: np.ndarray,
+    ) -> StructuredPayload:
+        scalar_count = int(left_idx.size + right_idx.size)
+        return StructuredPayload(
+            value=(left_idx, right_idx),
+            shape=(scalar_count,),
+            scalar_count=scalar_count,
+            estimated_bytes=int(left_idx.nbytes + right_idx.nbytes),
+        )
+
+    @staticmethod
+    def _split_selection_payload(
+        split_ref: OpaqueSplitReference,
+        indices: np.ndarray,
+    ) -> StructuredPayload:
+        return StructuredPayload(
+            value=(split_ref, indices),
+            shape=(len(indices),),
+            scalar_count=int(len(indices) + 2),
+            estimated_bytes=int(indices.nbytes + 16),
+        )
+
+    def _route_selected_split(
+        self,
+        *,
+        party: PassiveParty,
+        indices: np.ndarray,
+        split_ref: OpaqueSplitReference,
+        active_name: str,
+        stage: str,
+        step: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        routing_state = self._routing_states.get(party.name)
+        if routing_state is None:
+            raise RuntimeError(f"missing party-local routing handle for {party.name}")
+
+        route_indices = indices
+        route_ref = split_ref
+        if party.name != active_name:
+            delivered = self.transport.send(
+                self._split_selection_payload(split_ref, indices),
+                message_type="split_selection",
+                sender_role=active_name,
+                receiver_role=party.name,
+                direction="backward",
+                stage=stage,
+                step=step,
+            )
+            route_ref, route_indices = delivered
+            route_indices = np.asarray(route_indices, dtype=int)
+
+        left_idx, right_idx = party.route_split(route_indices, route_ref, routing_state)
+        if party.name != active_name:
+            delivered_routing = self.transport.send(
+                self._routing_payload(left_idx, right_idx),
+                message_type="partition_routing_indices",
+                sender_role=party.name,
+                receiver_role=active_name,
+                direction="forward",
+                stage=stage,
+                step=step,
+            )
+            left_idx, right_idx = delivered_routing
+        return np.asarray(left_idx, dtype=int), np.asarray(right_idx, dtype=int)
+
     def _build_node(
         self,
         parties: dict[str, PassiveParty],
         gradients: np.ndarray,
         hessians: np.ndarray,
+        gradient_signals: dict[str, np.ndarray],
+        hessian_signals: dict[str, np.ndarray],
         indices: np.ndarray,
         depth: int,
         rng: np.random.Generator,
@@ -143,54 +232,83 @@ class VFLHistGBDT:
             or leaf_limit_reached
         ):
             return node
+
         active_name = next(iter(parties))
         best_gain = 0.0
         best: tuple[PassiveParty, HistogramCandidate] | None = None
         for party in parties.values():
             feature_indices = self._feature_indices(party, rng)
-            candidates = party.candidate_histograms(
-                gradients,
-                hessians,
-                indices,
+            party_indices = indices
+            party_feature_indices = feature_indices
+            if party.name != active_name:
+                party_indices = np.asarray(
+                    self.transport.send(
+                        indices,
+                        message_type="node_membership",
+                        sender_role=active_name,
+                        receiver_role=party.name,
+                        direction="backward",
+                        stage="tree",
+                        step=tree_index,
+                    ),
+                    dtype=int,
+                )
+                party_feature_indices = np.asarray(
+                    self.transport.send(
+                        feature_indices,
+                        message_type="feature_subsample_refs",
+                        sender_role=active_name,
+                        receiver_role=party.name,
+                        direction="backward",
+                        stage="tree",
+                        step=tree_index,
+                    ),
+                    dtype=int,
+                )
+
+            local_candidates = party.candidate_histograms(
+                gradient_signals[party.name],
+                hessian_signals[party.name],
+                party_indices,
                 self.max_bins,
                 self.min_samples_leaf,
-                feature_indices,
+                party_feature_indices,
             )
+            candidates = local_candidates
             if party.name != active_name:
-                self.transport.send(
-                    np.empty((len(candidates), 8), dtype=float),
-                    message_type="candidate_histogram_metadata",
+                candidates = self.transport.send(
+                    self._candidate_payload(local_candidates),
+                    message_type="candidate_histogram_statistics",
                     sender_role=party.name,
                     receiver_role=active_name,
                     direction="forward",
                     stage="tree",
                     step=tree_index,
                 )
+
             for cand in candidates:
                 gain = self._split_gain(cand)
                 if gain > best_gain:
                     best_gain = gain
                     best = (party, cand)
+
         if best is None:
             return node
+
         party, cand = best
         split_ref = cand["split_ref"]
-        feature = split_ref.feature_ref
-        left_idx, right_idx = party.route_split(indices, split_ref)
-        if party.name != active_name:
-            self.transport.send(
-                np.asarray([len(left_idx), len(right_idx)]),
-                message_type="partition_routing_counts",
-                sender_role=party.name,
-                receiver_role=active_name,
-                direction="forward",
-                stage="tree",
-                step=tree_index,
-            )
+        left_idx, right_idx = self._route_selected_split(
+            party=party,
+            indices=indices,
+            split_ref=split_ref,
+            active_name=active_name,
+            stage="tree",
+            step=tree_index,
+        )
         if len(left_idx) < self.min_samples_leaf or len(right_idx) < self.min_samples_leaf:
             return node
+
         node.party = party.name
-        node.feature = feature
         node.split_ref = split_ref
         node.gain = float(best_gain)
         leaf_count[0] += 1
@@ -198,6 +316,8 @@ class VFLHistGBDT:
             parties,
             gradients,
             hessians,
+            gradient_signals,
+            hessian_signals,
             left_idx,
             depth + 1,
             rng,
@@ -208,6 +328,8 @@ class VFLHistGBDT:
             parties,
             gradients,
             hessians,
+            gradient_signals,
+            hessian_signals,
             right_idx,
             depth + 1,
             rng,
@@ -217,22 +339,36 @@ class VFLHistGBDT:
         return node
 
     def _predict_tree(
-        self, tree: TreeNode, parties: dict[str, PassiveParty], n_rows: int
+        self,
+        tree: TreeNode,
+        parties: dict[str, PassiveParty],
+        n_rows: int,
+        *,
+        tree_index: int,
+        stage: str,
     ) -> np.ndarray:
         out = np.zeros(n_rows, dtype=float)
+        active_name = self.party_names_[0]
 
         def walk(node: TreeNode, idx: np.ndarray) -> None:
             if node.is_leaf:
                 out[idx] = node.value
                 return
-            if node.party is None or node.feature is None or node.split_ref is None:
+            if node.party is None or node.split_ref is None:
                 raise RuntimeError("non-leaf node is missing split metadata")
             if node.party not in parties:
                 if self.missing_party_policy == "zero_contribution":
                     out[idx] = 0.0
                     return
                 raise ValueError(f"missing split-owning party for inference: {node.party}")
-            left_idx, right_idx = parties[node.party].route_split(idx, node.split_ref)
+            left_idx, right_idx = self._route_selected_split(
+                party=parties[node.party],
+                indices=idx,
+                split_ref=node.split_ref,
+                active_name=active_name,
+                stage=stage,
+                step=tree_index,
+            )
             if node.left is None or node.right is None:
                 raise RuntimeError("non-leaf node is missing child nodes")
             walk(node.left, left_idx)
@@ -259,8 +395,15 @@ class VFLHistGBDT:
             raise ValueError("all VFL parties must align to the same row count")
         if self.early_stopping_rounds is not None and validation_active is None:
             raise ValueError("validation data are required when early stopping is enabled")
+
         parties = {party.name: party for party in party_list}
         self.party_names_ = list(parties)
+        for party in party_list:
+            party.prepare_histogram_bins(self.max_bins)
+        self._routing_states = {
+            party.name: party.export_histogram_routing_state() for party in party_list
+        }
+
         y = active.labels
         prevalence = np.clip(y.mean(), 1e-6, 1.0 - 1e-6)
         self.base_score_ = float(np.log(prevalence / (1.0 - prevalence)))
@@ -282,6 +425,8 @@ class VFLHistGBDT:
             validation_n = validation_active.n_rows
             if any(party.n_rows != validation_n for party in validation_mapping.values()):
                 raise ValueError("validation parties must align to the same row count")
+            for name, source_party in parties.items():
+                source_party.share_histogram_routing_state_with(validation_mapping[name])
             validation_raw = np.full(validation_n, self.base_score_, dtype=float)
             validation_labels = validation_active.labels
 
@@ -292,25 +437,34 @@ class VFLHistGBDT:
             probability = _sigmoid(raw)
             gradients = probability - y
             hessians = np.maximum(probability * (1.0 - probability), 1e-8)
+            gradient_signals = {active.name: gradients}
+            hessian_signals = {active.name: hessians}
             for party in passive:
-                self.transport.send(
-                    gradients,
-                    message_type="gradients",
-                    sender_role=active.name,
-                    receiver_role=party.name,
-                    direction="backward",
-                    stage="tree",
-                    step=tree_index,
+                gradient_signals[party.name] = np.asarray(
+                    self.transport.send(
+                        gradients,
+                        message_type="gradients",
+                        sender_role=active.name,
+                        receiver_role=party.name,
+                        direction="backward",
+                        stage="tree",
+                        step=tree_index,
+                    ),
+                    dtype=float,
                 )
-                self.transport.send(
-                    hessians,
-                    message_type="hessians",
-                    sender_role=active.name,
-                    receiver_role=party.name,
-                    direction="backward",
-                    stage="tree",
-                    step=tree_index,
+                hessian_signals[party.name] = np.asarray(
+                    self.transport.send(
+                        hessians,
+                        message_type="hessians",
+                        sender_role=active.name,
+                        receiver_role=party.name,
+                        direction="backward",
+                        stage="tree",
+                        step=tree_index,
+                    ),
+                    dtype=float,
                 )
+
             if self.subsample >= 1.0:
                 tree_indices = np.arange(n, dtype=int)
             else:
@@ -320,10 +474,13 @@ class VFLHistGBDT:
                 )
                 sample_size = min(sample_size, n)
                 tree_indices = np.sort(rng.choice(n, size=sample_size, replace=False)).astype(int)
+
             tree = self._build_node(
                 parties,
                 gradients,
                 hessians,
+                gradient_signals,
+                hessian_signals,
                 tree_indices,
                 0,
                 rng,
@@ -331,7 +488,13 @@ class VFLHistGBDT:
                 tree_index,
             )
             self.trees_.append(tree)
-            raw += self.learning_rate * self._predict_tree(tree, parties, n)
+            raw += self.learning_rate * self._predict_tree(
+                tree,
+                parties,
+                n,
+                tree_index=tree_index,
+                stage="training_routing",
+            )
             self.training_loss_history_.append(_binary_log_loss(y, _sigmoid(raw)))
 
             if (
@@ -340,7 +503,11 @@ class VFLHistGBDT:
                 and validation_labels is not None
             ):
                 validation_raw += self.learning_rate * self._predict_tree(
-                    tree, validation_mapping, len(validation_raw)
+                    tree,
+                    validation_mapping,
+                    len(validation_raw),
+                    tree_index=tree_index,
+                    stage="validation_routing",
                 )
                 validation_loss = _binary_log_loss(
                     validation_labels,
@@ -379,8 +546,14 @@ class VFLHistGBDT:
         if any(party.n_rows != n for party in parties):
             raise ValueError("inference parties must have equal row counts")
         raw = np.full(n, self.base_score_, dtype=float)
-        for tree in self.trees_:
-            raw += self.learning_rate * self._predict_tree(tree, mapping, n)
+        for tree_index, tree in enumerate(self.trees_):
+            raw += self.learning_rate * self._predict_tree(
+                tree,
+                mapping,
+                n,
+                tree_index=tree_index,
+                stage="inference_routing",
+            )
         return raw
 
     def predict_proba(self, parties: list[PassiveParty]) -> np.ndarray:

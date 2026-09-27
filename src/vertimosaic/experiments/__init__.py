@@ -1,4 +1,4 @@
-from vertimosaic.experiments.benchmarks import run_cpu_benchmarks
+from vertimosaic.experiments.benchmarks import run_cpu_benchmarks, run_external_cpu_benchmark
 from vertimosaic.experiments.case_study_run import run_distributed_signal_case_study
 from vertimosaic.experiments.contribution import (
     enumerate_party_subsets,
@@ -16,6 +16,7 @@ from vertimosaic.experiments.missing_parties import (
     prepare_missing_party_method,
     run_missing_party_methods_study,
 )
+from vertimosaic.experiments.overlap_study import run_overlap_study
 from vertimosaic.experiments.paper_artifacts import (
     build_main_results_table,
     generate_publication_artifacts,
@@ -32,7 +33,6 @@ from vertimosaic.experiments.studies import (
     run_ablation_study,
     run_drift_study,
     run_dropout_study,
-    run_overlap_study,
 )
 
 __all__ = [
@@ -58,6 +58,7 @@ __all__ = [
     "run_distributed_signal_case_study",
     "run_drift_study",
     "run_dropout_study",
+    "run_external_cpu_benchmark",
     "run_external_experiment",
     "run_feature_importance_study",
     "run_ieee_cis_experiment",

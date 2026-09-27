@@ -7,8 +7,26 @@ import numpy as np
 
 
 @dataclass(frozen=True)
+class StructuredPayload:
+    """Explicit metadata for a structured simulated protocol payload.
+
+    The wrapped value is ephemeral. Only shape/scalar-count/estimated-byte metadata
+    is copied into the audit trail.
+    """
+
+    value: Any = field(repr=False, compare=False)
+    shape: tuple[int, ...] | None
+    scalar_count: int
+    estimated_bytes: int
+
+    def __post_init__(self) -> None:
+        if self.scalar_count < 0 or self.estimated_bytes < 0:
+            raise ValueError("structured payload metadata must be non-negative")
+
+
+@dataclass(frozen=True)
 class Message:
-    """Ephemeral metadata envelope for one simulated federated communication."""
+    """Ephemeral envelope for one simulated federated communication."""
 
     message_type: str
     sender_role: str
@@ -19,6 +37,7 @@ class Message:
     direction: str | None = None
     stage: str | None = None
     step: int | None = None
+    payload: Any = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -52,10 +71,11 @@ class AuditEvent:
 
 @dataclass
 class InMemoryTransport:
-    """Metadata-only communication audit.
+    """Ephemeral Message transport with metadata-only persistent auditing.
 
-    Each send creates an ephemeral :class:`Message`. Payload values are returned
-    to the protocol caller but never retained by the transport or audit log.
+    Every protocol ``send`` creates a :class:`Message` carrying the ephemeral payload.
+    The transport returns that message payload to the protocol caller but persists only
+    an :class:`AuditEvent`, so row-level values are never retained in the audit log.
     """
 
     audit_log: list[AuditEvent] = field(default_factory=list)
@@ -71,7 +91,14 @@ class InMemoryTransport:
         stage: str | None = None,
         step: int | None = None,
     ) -> Any:
-        shape, count, size = self._metadata(payload)
+        if isinstance(payload, StructuredPayload):
+            wire_value = payload.value
+            shape = payload.shape
+            count = payload.scalar_count
+            size = payload.estimated_bytes
+        else:
+            wire_value = payload
+            shape, count, size = self._metadata(payload)
         message = Message(
             message_type,
             sender_role,
@@ -82,9 +109,10 @@ class InMemoryTransport:
             direction,
             stage,
             step,
+            wire_value,
         )
         self.audit_log.append(AuditEvent.from_message(message))
-        return payload
+        return message.payload
 
     @staticmethod
     def _metadata(payload: Any) -> tuple[tuple[int, ...] | None, int, int]:

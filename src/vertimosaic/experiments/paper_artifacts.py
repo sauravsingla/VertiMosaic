@@ -121,6 +121,7 @@ def generate_publication_artifacts(
             y="pr_auc",
             title="Performance vs entity overlap",
             output_stem=figure_directory / "performance_vs_overlap",
+            series="method",
         ),
         save_category_metric_plot(
             dropout,

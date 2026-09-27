@@ -23,6 +23,7 @@ from vertimosaic.experiments import (
     run_demo,
     run_drift_study,
     run_dropout_study,
+    run_external_cpu_benchmark,
     run_external_experiment,
     run_ieee_cis_experiment,
     run_overlap_study,
@@ -212,20 +213,38 @@ def drift(rows: int = typer.Option(1600, min=400), seed: int = 42) -> None:
 
 @app.command("benchmark")
 def benchmark(
-    sizes: str = typer.Option("10000,30000,50000,100000"),
+    sizes: str = typer.Option("10000,30000,50000,100000,250000"),
     model: str = "logistic",
+    mode: str = typer.Option(
+        "synthetic_scale",
+        help="synthetic_scale, observed_target_external or distributed_signal_external",
+    ),
     seed: int = 42,
     bootstrap_replicates: int = typer.Option(1000, min=10),
+    cross_party_correlation: float = typer.Option(0.25, min=0.0, max=1.0),
+    insurance_sample_size: int | None = typer.Option(None, min=1),
 ) -> None:
-    parsed = [int(item.strip()) for item in sizes.split(",") if item.strip()]
-    if any(item < 200 for item in parsed):
-        raise typer.BadParameter("benchmark sizes must be at least 200")
-    frame = run_cpu_benchmarks(
-        parsed,
-        seed=seed,
-        model_name=model,
-        bootstrap_replicates=bootstrap_replicates,
-    )
+    if mode == "synthetic_scale":
+        parsed = [int(item.strip()) for item in sizes.split(",") if item.strip()]
+        if any(item < 200 for item in parsed):
+            raise typer.BadParameter("benchmark sizes must be at least 200")
+        frame = run_cpu_benchmarks(
+            parsed,
+            seed=seed,
+            model_name=model,
+            bootstrap_replicates=bootstrap_replicates,
+        )
+    elif mode in {"observed_target_external", "distributed_signal_external"}:
+        frame = run_external_cpu_benchmark(
+            mode=mode,
+            seed=seed,
+            model_name=model,
+            bootstrap_replicates=bootstrap_replicates,
+            cross_party_correlation=cross_party_correlation,
+            insurance_sample_size=insurance_sample_size,
+        )
+    else:
+        raise typer.BadParameter(f"unsupported benchmark mode: {mode}")
     typer.echo(frame.to_csv(index=False))
 
 

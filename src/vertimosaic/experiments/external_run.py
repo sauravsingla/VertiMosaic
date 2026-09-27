@@ -71,6 +71,17 @@ def _fit_external_model(
     model.fit(train_active, train_passive, validation_active, validation_passive)
 
 
+def _share_gbdt_state(
+    model: VFLLogisticRegression | VFLHistGBDT,
+    source: list[PassiveParty],
+    target: list[PassiveParty],
+) -> None:
+    if not isinstance(model, VFLHistGBDT):
+        return
+    for source_party, target_party in zip(source, target, strict=True):
+        source_party.share_histogram_routing_state_with(target_party)
+
+
 def _party_permuted_probabilities(
     model: VFLLogisticRegression | VFLHistGBDT,
     active: ActiveParty,
@@ -80,6 +91,7 @@ def _party_permuted_probabilities(
 ) -> dict[str, np.ndarray]:
     output: dict[str, np.ndarray] = {}
     all_names = [active.name, *[party.name for party in passive]]
+    source_parties: list[PassiveParty] = [active, *passive]
     for party_index, party_name in enumerate(all_names):
         rng = np.random.default_rng(seed + 500 + party_index)
         permutation = rng.permutation(active.n_rows)
@@ -95,7 +107,9 @@ def _party_permuted_probabilities(
                 )
                 for item in passive
             ]
-        output[party_name] = model.predict_proba([permuted_active, *permuted_passive])[:, 1]
+        target_parties: list[PassiveParty] = [permuted_active, *permuted_passive]
+        _share_gbdt_state(model, source_parties, target_parties)
+        output[party_name] = model.predict_proba(target_parties)[:, 1]
     return output
 
 
@@ -228,6 +242,11 @@ def run_external_experiment(
     rss_before = process.memory_info().rss
     start = time.perf_counter()
     _fit_external_model(model, train_active, train_passive, val_active, val_passive)
+    _share_gbdt_state(
+        model,
+        [train_active, *train_passive],
+        [test_active, *test_passive],
+    )
     training_seconds = time.perf_counter() - start
     peak_rss_bytes = max(rss_before, process.memory_info().rss)
     validation_p = model.predict_proba([val_active, *val_passive])[:, 1]
@@ -313,7 +332,9 @@ def run_external_experiment(
     if mode == "distributed_signal_external":
         bank_model = _external_model(model_name, seed + 1, early_stopping=True)
         _fit_external_model(bank_model, train_active, [], val_active, [])
-        bank_only_p = bank_model.predict_proba([test_active])[:, 1]
+        bank_test_active = ActiveParty("bank", test_active._x.copy(), test_active.labels)
+        _share_gbdt_state(bank_model, [train_active], [bank_test_active])
+        bank_only_p = bank_model.predict_proba([bank_test_active])[:, 1]
         party_permuted = _party_permuted_probabilities(
             model,
             test_active,
