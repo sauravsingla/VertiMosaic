@@ -18,6 +18,8 @@ def run_cpu_benchmarks(
     model_name: str = "logistic",
     bootstrap_replicates: int = 100,
     directory: Path = Path("benchmarks"),
+    write_runs: bool = True,
+    runs_root: Path = Path("runs"),
 ) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     for size in sizes:
@@ -26,7 +28,8 @@ def run_cpu_benchmarks(
             seed=seed,
             model_name=model_name,
             bootstrap_replicates=bootstrap_replicates,
-            write_run=False,
+            write_run=write_runs,
+            runs_root=runs_root,
         )
         metrics = result["metrics"]
         communication = result["communication"]
@@ -51,6 +54,7 @@ def run_cpu_benchmarks(
                 "pr_auc": metrics["pr_auc"],
                 "brier": metrics["brier"],
                 "f1": metrics["f1"],
+                "run_directory": result.get("run_directory"),
             }
         )
     frame = pd.DataFrame(rows)
