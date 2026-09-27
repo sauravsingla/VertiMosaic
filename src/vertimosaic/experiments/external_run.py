@@ -34,6 +34,7 @@ def _external_model(
             learning_rate=0.08,
             max_iter=500,
             l2=1e-3,
+            early_stopping_rounds=5 if early_stopping else None,
             seed=seed,
         )
     if model_name == "vfl-hist-gbdt":
@@ -54,10 +55,7 @@ def _fit_external_model(
     validation_active: ActiveParty,
     validation_passive: list[PassiveParty],
 ) -> None:
-    if isinstance(model, VFLHistGBDT):
-        model.fit(train_active, train_passive, validation_active, validation_passive)
-    else:
-        model.fit(train_active, train_passive)
+    model.fit(train_active, train_passive, validation_active, validation_passive)
 
 
 def _party_permuted_probabilities(
