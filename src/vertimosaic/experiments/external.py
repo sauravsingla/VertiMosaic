@@ -16,20 +16,22 @@ class ExternalBenchmark:
     passive: list[PassiveParty]
     linkage_manifests: dict[str, LinkageManifest]
     mode: str
+    feature_frames: dict[str, pd.DataFrame]
 
 
 def _numeric_matrix(frame: pd.DataFrame) -> np.ndarray:
-    """Locally turn one party's prepared frame into a finite numeric research matrix."""
+    """Create a finite numeric linkage representation, not a fitted model preprocessor."""
     columns: list[np.ndarray] = []
     for name in frame.columns:
         series = frame[name]
         if pd.api.types.is_numeric_dtype(series):
             values = pd.to_numeric(series, errors="coerce").to_numpy(dtype=float)
+            values = np.where(np.isfinite(values), values, 0.0)
         else:
-            values = pd.factorize(series.astype("string"), sort=True)[0].astype(float)
-        finite = np.isfinite(values)
-        fill = float(np.median(values[finite])) if finite.any() else 0.0
-        columns.append(np.where(finite, values, fill))
+            text = series.astype("string").fillna("<missing>")
+            hashed = pd.util.hash_pandas_object(text, index=False).to_numpy(dtype=np.uint64)
+            values = (hashed % np.uint64(1_000_003)).astype(float)
+        columns.append(values)
     if not columns:
         raise ValueError("prepared party frame contains no usable features")
     return np.column_stack(columns)
@@ -41,12 +43,13 @@ def _link_passive(
     *,
     correlation: float,
     seed: int,
-) -> tuple[np.ndarray, LinkageManifest]:
+) -> tuple[pd.DataFrame, np.ndarray, LinkageManifest]:
     donor_matrix = _numeric_matrix(bundle.features)
     result = GaussianCopulaLinker(cross_party_correlation=correlation, seed=seed).link(
         anchor_matrix, donor_matrix
     )
-    linked = donor_matrix[result.donor_indices]
+    linked_frame = bundle.features.iloc[result.donor_indices].reset_index(drop=True)
+    linked_matrix = donor_matrix[result.donor_indices]
     manifest = LinkageManifest(
         method="gaussian_copula_rank_proximity",
         seed=seed,
@@ -58,7 +61,7 @@ def _link_passive(
         target_blind=True,
         sampled_with_replacement=result.unique_donors < result.anchor_rows,
     )
-    return linked, manifest
+    return linked_frame, linked_matrix, manifest
 
 
 def _standardized_signal(values: np.ndarray) -> np.ndarray:
@@ -87,29 +90,33 @@ def prepare_external_benchmark(
             for name in ("bank", "telecom", "insurance", "retail")
         }
     bank = bundles["bank"]
-    bank_matrix = _numeric_matrix(bank.features)
+    bank_frame = bank.features.reset_index(drop=True)
+    bank_matrix = _numeric_matrix(bank_frame)
     if bank.target is None:
         raise ValueError("Bank external bundle must contain the observed target")
     observed_target = np.asarray(bank.target, dtype=float).reshape(-1)
     if len(observed_target) != len(bank_matrix):
         raise ValueError("Bank target and prepared features must have equal row count")
-    linked: dict[str, np.ndarray] = {}
+
+    linked_frames: dict[str, pd.DataFrame] = {}
+    linked_matrices: dict[str, np.ndarray] = {}
     manifests: dict[str, LinkageManifest] = {}
     for offset, name in enumerate(("telecom", "insurance", "retail"), start=1):
-        linked[name], manifests[name] = _link_passive(
+        linked_frames[name], linked_matrices[name], manifests[name] = _link_passive(
             bank_matrix,
             bundles[name],
             correlation=cross_party_correlation,
             seed=seed + offset,
         )
+
     if mode == "observed_target_external":
         y = observed_target
     else:
         rng = np.random.default_rng(seed)
         bank_signal = _standardized_signal(bank_matrix)
-        telecom_signal = _standardized_signal(linked["telecom"])
-        insurance_signal = _standardized_signal(linked["insurance"])
-        retail_signal = _standardized_signal(linked["retail"])
+        telecom_signal = _standardized_signal(linked_matrices["telecom"])
+        insurance_signal = _standardized_signal(linked_matrices["insurance"])
+        retail_signal = _standardized_signal(linked_matrices["retail"])
         logit = (
             0.8 * bank_signal
             + 0.7 * telecom_signal
@@ -121,15 +128,23 @@ def prepare_external_benchmark(
         )
         probability = 1.0 / (1.0 + np.exp(-np.clip(logit, -35.0, 35.0)))
         y = rng.binomial(1, probability).astype(float)
+
+    feature_frames = {
+        "bank": bank_frame,
+        "telecom": linked_frames["telecom"],
+        "insurance": linked_frames["insurance"],
+        "retail": linked_frames["retail"],
+    }
     return ExternalBenchmark(
         active=ActiveParty("bank", bank_matrix, y),
         passive=[
-            PassiveParty("telecom", linked["telecom"]),
-            PassiveParty("insurance", linked["insurance"]),
-            PassiveParty("retail", linked["retail"]),
+            PassiveParty("telecom", linked_matrices["telecom"]),
+            PassiveParty("insurance", linked_matrices["insurance"]),
+            PassiveParty("retail", linked_matrices["retail"]),
         ],
         linkage_manifests=manifests,
         mode=mode,
+        feature_frames=feature_frames,
     )
 
 
