@@ -55,11 +55,7 @@ def comparison_observation(comparison: dict[str, Any]) -> str:
     secondary_delta = comparison.get("paired_pr_auc_delta")
     secondary_lower = comparison.get("paired_pr_auc_lower")
     secondary_upper = comparison.get("paired_pr_auc_upper")
-    if (
-        secondary_delta is not None
-        and secondary_lower is not None
-        and secondary_upper is not None
-    ):
+    if secondary_delta is not None and secondary_lower is not None and secondary_upper is not None:
         observations.append(
             interpret_delta(
                 "pr_auc",
