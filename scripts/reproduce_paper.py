@@ -81,10 +81,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--smoke",
         action="store_true",
-        help=(
-            "Use smaller CPU-friendly sizes and 100 bootstrap replicates; "
-            "skip external case study."
-        ),
+        help=("Use smaller CPU-friendly sizes and 100 bootstrap replicates; skip external case study."),
     )
     arguments = parser.parse_args()
     main(smoke=arguments.smoke)
