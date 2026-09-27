@@ -31,8 +31,17 @@ The framework emphasizes **scientific reproducibility, explicit privacy boundari
 - **Reproducible experiment bundles:** configuration, provenance, environment, metrics, predictions, communication metadata, hashes, seed, timestamps, and Git SHA.
 - **Explicit threat model:** no claim of automatic PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, malicious-party security, or formal differential privacy.
 
+## Architecture in Motion
+
+<p align="center">
+  <img src="assets/vertimosaic-architecture.svg" alt="Animated VertiMosaic architecture" width="100%">
+</p>
+
+The animation reflects the current reference protocols. Raw feature matrices stay party-local. `VFLLogisticRegression` uses local logits and residual signals with party-local gradient computation, while `VFLHistGBDT` uses gradients, Hessians, local histogram candidates, aggregate candidate metadata, and party-local split routing. `InMemoryTransport` records communication metadata for the in-process research simulator; it is not a cryptographic transport layer.
+
 ## Table of Contents
 
+- [Architecture in Motion](#architecture-in-motion)
 - [Installation](#hammer_and_wrench-installation)
 - [Quick Start](#rocket-quick-start)
 - [Technical Components](#bricks-technical-components)
