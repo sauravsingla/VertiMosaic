@@ -105,6 +105,7 @@ pytest -q --cov=vertimosaic --cov-report=term-missing
 bandit -r src
 pip-audit
 vertimosaic demo --rows 2000 --seed 42
+python scripts/reproduce_paper.py --smoke
 python -m build
 twine check dist/*
 ```
