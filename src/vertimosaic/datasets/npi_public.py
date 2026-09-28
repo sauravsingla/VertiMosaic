@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Sequence
 
 import numpy as np
 import pandas as pd
