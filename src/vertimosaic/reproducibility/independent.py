@@ -103,9 +103,7 @@ def write_independent_reproduction_bundle(
     )
 
     manifest_targets = sorted(
-        path
-        for path in output.iterdir()
-        if path.is_file() and path.name != "SHA256SUMS"
+        path for path in output.iterdir() if path.is_file() and path.name != "SHA256SUMS"
     )
     manifest_path = output / "SHA256SUMS"
     manifest_path.write_text(
