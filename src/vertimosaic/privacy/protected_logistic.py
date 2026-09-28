@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -119,7 +119,7 @@ def fit_protected_logistic(
     noise_multiplier: float = 2.0,
     adjacency: str = "replace_one",
     seed: int = 42,
-    model_kwargs: dict[str, object] | None = None,
+    model_kwargs: dict[str, Any] | None = None,
 ) -> ProtectedLogisticRun:
     """Run PSI alignment plus clipped-Gaussian residual-release VFL logistic training.
 
