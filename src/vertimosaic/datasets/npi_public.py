@@ -160,9 +160,7 @@ def build_npi_linked_frames(
     target = (linked["target_payment_sum"].to_numpy(dtype=float) >= threshold).astype(float)
     ids = tuple(linked["__npi"].astype(str).tolist())
 
-    active = linked[
-        ["prior_payment_count", "prior_payment_sum", "prior_payment_mean"]
-    ].copy()
+    active = linked[["prior_payment_count", "prior_payment_sum", "prior_payment_mean"]].copy()
     nppes_requested = set(nppes_feature_columns)
     care_requested = set(care_feature_columns)
     nppes_names = [column for column in linked.columns if column in nppes_requested]
