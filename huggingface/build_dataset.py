@@ -92,6 +92,7 @@ def _decorate(frame: pd.DataFrame, family: str, source_sha: str) -> pd.DataFrame
 def _dataset_card() -> str:
     return """---
 license: apache-2.0
+pretty_name: VertiMosaic VFL Benchmark
 tags:
 - vertical-federated-learning
 - federated-learning
@@ -103,6 +104,7 @@ tags:
 - responsible-ai
 configs:
 - config_name: core-model-comparison
+  default: true
   data_files:
   - split: benchmark
     path: data/core_model_comparison.parquet
@@ -140,6 +142,16 @@ No UCI, OpenML, or IEEE-CIS source rows are redistributed in this Hugging Face d
 
 The four-industry external research benchmark in VertiMosaic is explicitly **semi-synthetic**: its public Bank, Telecom, Insurance, and Retail sources do not describe the same real people. The optional IEEE-CIS mode is a separate two-party linked sanity benchmark using user-supplied authorized local files and those files are never redistributed here.
 
+## Dataset Viewer configurations
+
+The Hub card explicitly maps each configuration to one canonical Parquet file. This prevents auxiliary provenance or summary artifacts from being inferred as dataset splits and keeps each experimental family independently inspectable in Dataset Viewer.
+
+- `core-model-comparison` — `data/core_model_comparison.parquet` (**default**)
+- `party-ablation` — `data/party_ablation.parquet`
+- `partial-overlap` — `data/partial_overlap.parquet`
+- `party-dropout` — `data/party_dropout.parquet`
+- `feature-drift` — `data/feature_drift.parquet`
+
 ## Configurations
 
 - `core-model-comparison`: VFL logistic regression and VFL histogram GBDT on the same synthetic vertical population.
@@ -164,6 +176,12 @@ benchmark = load_dataset(
 )
 print(benchmark)
 ```
+
+## Related artifacts
+
+- Interactive Space: https://huggingface.co/spaces/sauravsingla08/VertiMosaic
+- Source repository: https://github.com/sauravsingla/VertiMosaic
+- Dataset: https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark
 
 ## Intended use
 
