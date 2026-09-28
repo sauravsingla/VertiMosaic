@@ -1,11 +1,11 @@
 <h1 align="center">VertiMosaic</h1>
 
 <p align="center">
-  <b>Cross-Industry Vertical Federated Learning for Tabular Data</b>
+  <b>CPU-first Vertical Federated Learning for Heterogeneous Tabular Data</b>
 </p>
 
 <p align="center">
-  A research framework for reproducible vertical federated learning across organizations that hold complementary attributes about overlapping entities while keeping raw feature tables local.
+  A reproducible research framework for organizations that hold complementary feature columns about the same or overlapping entities while keeping raw party feature tables local.
 </p>
 
 <p align="center">
@@ -19,68 +19,47 @@
   <a href="https://huggingface.co/spaces/sauravsingla08/VertiMosaic"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Live%20Space-FFD21E" alt="Hugging Face Space"></a>
 </p>
 
-VertiMosaic is an open-source research framework for **vertical federated learning (VFL)** on heterogeneous tabular data. It is designed for experiments in which different organizations own different feature columns for the same or overlapping entities and raw passive-party feature matrices are not pooled into the active party.
+VertiMosaic is an open-source **vertical federated learning (VFL)** research framework for tabular data. Different parties retain different feature columns for aligned entities, and the reference VFL protocols request party-local computations instead of pooling passive-party raw feature matrices at the active party.
 
-The framework emphasizes **scientific reproducibility, explicit privacy boundaries, source provenance, communication auditing, and efficient reference implementations**. It deliberately distinguishes raw-feature locality and pseudonymization from stronger cryptographic privacy guarantees.
+The project focuses on **reproducibility, provenance, communication measurement, explicit privacy boundaries, and CPU-friendly reference implementations**. Raw-feature locality is a design property; it is not presented as equivalent to end-to-end cryptographic privacy.
 
-### First-screen protocol facts
+## At a glance
 
-| Property | VertiMosaic |
+| Property | Current scope |
 |---|---|
-| Federation type | **TRUE Vertical Federated Learning** |
-| Bank role | Financial/payment features + target |
-| Telecom role | Communications/service features |
-| Insurance role | Claims/risk features |
-| Retail role | Purchase features |
-| Raw party feature tables pooled during VFL | **NO** |
-| CPU supported | **YES** |
-| GPU required | **NO** |
-| Graph ML required | **NO** |
-| External real-world datasets | **YES** |
-| Four public sources describe the same real individuals | **NO** |
-| Cross-industry linkage | **SEMI-SYNTHETIC AND EXPLICITLY DOCUMENTED** |
+| Federation | Vertical federated learning |
+| Reference models | `VFLLogisticRegression`, `VFLHistGBDT` |
+| Active party in the cross-industry benchmark | Bank, with target |
+| Passive parties | Telecom, Insurance, Retail |
+| Raw passive feature tables pooled during VFL | No |
+| Compute | CPU supported; GPU not required |
+| Public exact-linked benchmark | MovieLens 1M multi-table linkage |
+| Additional linked benchmarks | UCI exact-row vertical partition; authorized local IEEE-CIS transaction/identity linkage |
+| Cross-industry benchmark | Public-source, explicitly semi-synthetic linkage |
+| Default privacy posture | Research protocol with raw-feature locality; not end-to-end cryptographic VFL |
+| Optional privacy research mechanisms | Clipped Gaussian/zCDP releases, secure-sum and additive-sharing primitives, PSI and Paillier adapters |
 
-Horizontal FL generally uses different entities with a similar feature schema. Vertical FL aligns the same or overlapping entities while parties own different feature sets. **VertiMosaic implements the latter.**
-
-### Highlights
-
-- **True vertical partitioning:** Bank is the active party and owns the binary target; Telecom, Insurance, and Retail contribute complementary feature columns through party-local computations.
-- **Reference algorithms:** first-principles NumPy/scikit-learn ecosystem with no GPU requirement.
-- **Two VFL model families:** `VFLLogisticRegression` and `VFLHistGBDT`.
-- **Cross-industry research benchmark:** externally grounded, semi-synthetic linkage across public source domains.
-- **Optional genuinely linked benchmark:** authorized local IEEE-CIS transaction/identity files joined by exact `TransactionID` intersection.
-- **Reproducible experiment bundles:** configuration, provenance, environment, metrics, predictions, communication metadata, hashes, seed, timestamps, and Git SHA.
-- **Explicit threat model:** no claim of automatic PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, malicious-party security, or formal differential privacy.
-
-## Architecture in Motion
+## Architecture
 
 <p align="center">
-  <img src="assets/vertimosaic-architecture.svg" alt="Animated VertiMosaic architecture" width="100%">
+  <img src="assets/vertimosaic-architecture.svg" alt="VertiMosaic architecture" width="100%">
 </p>
 
-The animation reflects the current reference protocols. Raw feature matrices stay party-local. `VFLLogisticRegression` uses local logits and residual signals with party-local gradient computation. `VFLHistGBDT` sends target-derived gradients and Hessians, computes histogram candidates from retained party-local training bins, exposes only aggregate candidate statistics plus opaque feature/bin references, and applies selected splits inside the owning party. Numeric split thresholds stay party-local. `InMemoryTransport` records communication metadata for the in-process research simulator; it is not a cryptographic transport layer.
+The active party owns the target. Passive parties retain their raw feature matrices and return only protocol-specific local outputs. `VFLLogisticRegression` exchanges local logits/residual-related signals for party-local gradient updates. `VFLHistGBDT` exchanges target-derived gradient/Hessian signals and aggregate histogram candidate statistics while numeric split thresholds and routing state remain with the owning party.
 
-## Table of Contents
+`InMemoryTransport` provides deterministic protocol simulation and message auditing. `RemoteHTTPTransport` provides a separate serialized HTTP path with bounded requests/responses, authorization, replay controls, idempotency limits, rate limiting, optional compressed NumPy transport, and signed-message support. These transport controls do not turn the default learning protocol into malicious-secure VFL.
 
-- [Architecture in Motion](#architecture-in-motion)
-- [Installation](#hammer_and_wrench-installation)
-- [Quick Start](#rocket-quick-start)
-- [Technical Components](#bricks-technical-components)
-- [Framework Overview](#bulb-framework-overview)
-- [Reference Algorithms](#gear-reference-algorithms)
-- [Benchmark Modes](#test_tube-benchmark-modes)
-- [Partial Entity Overlap](#partial-entity-overlap)
-- [Privacy Boundary](#lock-privacy-boundary)
-- [External Data and Provenance](#card_file_box-external-data-and-provenance)
-- [Evaluation and Reproducibility](#bar_chart-evaluation-and-reproducibility)
-- [Verification](#white_check_mark-verification)
-- [Documentation](#books-documentation)
-- [Citation](#page_facing_up-citation)
-- [License](#balance_scale-license)
+## Installation
 
-## :hammer_and_wrench: Installation
+VertiMosaic supports Python **3.11 and 3.12**.
 
-VertiMosaic requires Python **3.11 or 3.12**.
+Install the latest published release:
+
+```bash
+python -m pip install vertimosaic
+```
+
+For the current repository state:
 
 ```bash
 git clone https://github.com/sauravsingla/VertiMosaic.git
@@ -95,54 +74,64 @@ For development and verification tooling:
 python -m pip install -e ".[dev]"
 ```
 
-## :rocket: Quick Start
+Optional PSI and Paillier adapters:
+
+```bash
+python -m pip install -e ".[privacy-crypto]"
+```
+
+## Quick start
 
 ```bash
 vertimosaic --help
 vertimosaic demo --rows 2000 --seed 42
 ```
 
-The quick-start demo is a smoke experiment and uses **100 bootstrap replicates**. Normal research experiment and benchmark commands default to **1,000 bootstrap replicates**. Experiment commands create a standard reproducibility bundle under `runs/<run_id>/`.
+The demo is a smoke experiment and uses **100 bootstrap replicates**. Normal research experiment and benchmark paths use **1,000 bootstrap replicates** where practical. Standard experiment outputs are written as reproducibility bundles under `runs/<run_id>/`.
 
-### Common commands
+### Useful research commands
 
-```bash
-vertimosaic datasets list
-vertimosaic datasets describe bank
-vertimosaic datasets verify
-vertimosaic datasets download bank
-vertimosaic datasets download-all
-vertimosaic prepare-external
-vertimosaic generate-synthetic
-vertimosaic train --model logistic
-vertimosaic train --model vfl-hist-gbdt
-vertimosaic evaluate
-vertimosaic ablation
-vertimosaic contribution
-vertimosaic overlap
-vertimosaic dropout
-vertimosaic drift
-vertimosaic benchmark --mode synthetic_scale --sizes 10000,30000,50000,100000,250000
-vertimosaic benchmark --mode observed_target_external --model vfl-hist-gbdt
-vertimosaic report
-vertimosaic external-demo --model vfl-hist-gbdt --seed 42
-```
+| Goal | Command |
+|---|---|
+| Formal centralized / single-party / VFL comparison | `vertimosaic-benchmark-matrix` |
+| Public exact-linked MovieLens benchmark | `vertimosaic-linked-movielens` |
+| Public UCI exact-row vertical partition | `vertimosaic-linked-uci` |
+| Separate-process serialized transport benchmark | `vertimosaic-remote-benchmark` |
+| Advanced privacy research audit | `vertimosaic-advanced-privacy-audit` |
+| Clean reproduction evidence bundle | `vertimosaic-reproduce` |
+| Cross-industry / synthetic CLI workflows | `vertimosaic --help` |
 
-### Optional IEEE-CIS linked benchmark
+## Reference protocols
 
-IEEE-CIS files are **authorized local inputs only**. VertiMosaic does not download or redistribute these competition files, and ordinary CI does not depend on them.
+### `VFLLogisticRegression`
 
-Prepare local inputs:
+A first-principles NumPy reference protocol. Each party computes logits and gradients using only its local feature matrix. Passive logits and residual-related signals pass through the explicit message/transport abstraction.
+
+### `VFLHistGBDT`
+
+A vertical histogram-gradient-boosting reference implementation. Each party fits and retains its own training-derived quantile bins. Passive parties compute aggregate histogram candidates from received gradient/Hessian signals and return aggregate statistics plus opaque feature/bin references. The active party selects a split; the owning party resolves the private numeric threshold and performs routing locally. Validation and test rows reuse training-derived routing state rather than refitting held-out bins.
+
+Centralized models are provided only as **non-federated baselines**. They deliberately pool selected feature columns and must not be described as VFL.
+
+## Benchmarks and linkage categories
+
+VertiMosaic keeps linkage categories explicit so reproducibility is not confused with stronger real-world linkage evidence.
+
+### 1. MovieLens 1M — public exact multi-table linkage
+
+`vertimosaic-linked-movielens` downloads MovieLens 1M directly from GroupLens and links its observed `users.dat`, `ratings.dat`, and `movies.dat` identifiers. The active side uses user demographics; the passive side derives historical rating/genre behavior from the earlier portion of each user's timeline; the target is derived from later rating events that are excluded from passive features.
+
+This is **genuine exact linkage across public tables describing the same service users**. It is still a single-service dataset, not cross-organization entity resolution and not evidence of PSI.
+
+### 2. IEEE-CIS — authorized local exact linkage
+
+The optional IEEE-CIS path joins locally authorized transaction and identity files on exact `TransactionID` intersection. VertiMosaic does not download or redistribute those competition files.
 
 ```bash
 vertimosaic prepare-ieee-cis \
   --transaction /path/to/train_transaction.csv \
   --identity /path/to/train_identity.csv
-```
 
-Run the genuinely linked two-party benchmark:
-
-```bash
 vertimosaic run-ieee-cis \
   --transaction /path/to/train_transaction.csv \
   --identity /path/to/train_identity.csv \
@@ -150,209 +139,111 @@ vertimosaic run-ieee-cis \
   --seed 42
 ```
 
-This mode uses the exact `TransactionID` intersection, keeps `isFraud` with the active transaction party, fits preprocessing independently on each party's training rows, evaluates on an entity-level held-out test set, pseudonymizes exported test identifiers, records source-file SHA-256 checksums, and writes the same reproducibility bundle as other experiments. It is a **two-party linked sanity benchmark** and is not presented as a four-industry benchmark.
+### 3. UCI Credit — exact-row vertical partition
 
-## :bricks: Technical Components
+`vertimosaic-linked-uci` retrieves UCI Default of Credit Card Clients at runtime and partitions disjoint source columns between active and passive parties while preserving exact entity rows. It is a useful public linkage sanity benchmark, but the two partitions originate from one source dataset and therefore do not demonstrate cross-organization entity resolution.
 
-VertiMosaic is organized around a small set of research components:
+### 4. Four-industry benchmark — semi-synthetic cross-domain linkage
 
-- **Party objects:** hold local feature matrices and perform party-local preprocessing/computation.
-- **Active party:** Bank owns the binary target and coordinates target-dependent training steps.
-- **Passive parties:** Telecom, Insurance, and Retail own complementary feature columns.
-- **Local preprocessing:** median imputation, robust/standard scaling, categorical imputation, one-hot encoding with unknown-category handling, configurable winsorization, and train-only local quantile binning.
-- **Linkage layer:** builds aligned research populations while preserving the distinction between real source data and semi-synthetic cross-domain linkage.
-- **VFL protocols:** logistic regression and histogram-gradient-boosting reference implementations.
-- **Communication simulator:** `InMemoryTransport` records message metadata such as type, sender/receiver roles, shapes, scalar counts, and estimated bytes without retaining transmitted array values.
-- **Evaluation layer:** entity-level splits, validation-only threshold selection, metrics, calibration, bootstrap confidence intervals, and paired bootstrap differences.
-- **Reproducibility layer:** run manifests, hashes, environment/dependency versions, predictions, provenance, configuration, and Git state.
+The Bank/Telecom/Insurance/Retail benchmark uses real public source-domain data but the four sources do **not** describe the same real individuals. They are independently preprocessed and connected by an explicitly documented research linkage mechanism.
 
-## :bulb: Framework Overview
+| Party | Public source | Role |
+|---|---|---|
+| Bank | UCI Default of Credit Card Clients (350) | Financial/payment behavior + observed target |
+| Telecom | UCI Iranian Churn (563) | Telecom/service behavior |
+| Insurance | OpenML `freMTPL2freq` + `freMTPL2sev` (41214/41215) | Claims/risk behavior |
+| Retail | UCI Online Retail (352) | Purchase behavior aggregated to customer level |
 
-```mermaid
-flowchart LR
-    A[Bank<br/>Active party<br/>Local features + target]
-    B[Telecom<br/>Passive party<br/>Local features]
-    C[Insurance<br/>Passive party<br/>Local features]
-    D[Retail<br/>Passive party<br/>Local features]
+`observed_target_external` uses the Bank target with target-blind external linkage. `distributed_signal_external` links transformed source-domain features first and generates the disclosed semi-synthetic target only after the linked profiles are formed.
 
-    A -->|local model contributions| V[VFL protocol]
-    B -->|local logits / gradients / statistics| V
-    C -->|local logits / gradients / statistics| V
-    D -->|local logits / gradients / statistics| V
+### 5. Controlled synthetic and overlap studies
 
-    V --> M[Training + evaluation]
-    V -. message metadata .-> T[InMemoryTransport audit]
-    M --> R[Reproducibility bundle]
-```
+`synthetic_scale` supports controlled scaling, overlap, dropout, drift, noise, and distributed-signal experiments. `vertimosaic overlap` evaluates **100%, 90%, 75%, 50%, and 25%** Bank-to-passive overlap while preserving deterministic entity splits and reporting coverage, utility, and communication separately for each strategy.
 
-VertiMosaic models **column-partitioned learning**. Federated model code requests local computations from party objects rather than concatenating passive raw matrices into the Bank. The in-memory transport provides a reproducible communication simulator and metadata audit; it is **not** a real network-isolation or cryptographic-security layer.
+For full linkage definitions and limitations, see [`docs/linked_benchmarks.md`](docs/linked_benchmarks.md) and [`docs/linkage.md`](docs/linkage.md).
 
-### Data representation
+## Evaluation, communication, and reproducibility
 
-| Party | Private information represented |
-|---|---|
-| Bank | Financial/payment behaviour + target |
-| Telecom | Communications/service behaviour |
-| Insurance | Claims/risk behaviour |
-| Retail | Purchase behaviour |
+Entity-level splits default to **70% train / 15% validation / 15% test**. Threshold selection uses validation predictions only.
 
-| Property | VertiMosaic |
-|---|---|
-| Federation type | Vertical Federated Learning |
-| Raw feature tables pooled | No |
-| GPU required | No |
-| Graph ML required | No |
-| External real-world datasets | Yes |
-| Four source datasets contain the same actual people | No |
-| Cross-industry linkage | Explicitly semi-synthetic |
-| Reference implementation | NumPy/scikit-learn ecosystem |
+Evaluation includes ROC-AUC, PR-AUC, precision, recall, F1, balanced accuracy, log loss, Brier score, calibration error, confusion counts, deterministic bootstrap intervals, and paired bootstrap differences.
 
-### True vertical federated learning
+`vertimosaic-benchmark-matrix` compares:
 
-Horizontal FL generally trains across different entities that share a similar feature schema. Vertical FL aligns the same or overlapping entities while parties own different feature columns. VertiMosaic implements the latter: passive-party raw feature matrices remain inside their party objects during federated training.
+- centralized all-feature **non-federated** logistic regression;
+- Bank-only **non-federated** logistic regression;
+- `VFLLogisticRegression`; and
+- `VFLHistGBDT`.
 
-The four primary public sources do **not** describe the same real people. The four-industry benchmark is therefore an **externally grounded semi-synthetic cross-industry VFL benchmark**. In observed-target mode, linkage is target-blind. In distributed-signal mode, the target is generated only after linked profiles are formed.
+The formal matrix records utility, training/inference wall-clock time, sampled process RSS, protocol payload bytes/message counts, robustness fields, and a reproducible privacy-attack baseline. Protocol payload accounting is not a packet capture.
 
-## :gear: Reference Algorithms
+`vertimosaic-remote-benchmark` separately exercises the real serialized HTTP path through a spawned relay process and records logical payload bytes plus transport-level request/response measurements and elapsed time. TLS record bytes are not claimed because the underlying HTTP client does not expose them.
 
-### `VFLLogisticRegression`
+Every standard run bundle records configuration, dataset/linkage provenance, environment and dependency versions, predictions, metrics, training history, communication metadata, hashes, timestamps, seed, and Git state. `vertimosaic-reproduce` creates an additional clean reproduction evidence bundle with environment metadata and a stable result digest.
 
-A first-principles NumPy reference protocol. Each party computes local logits and local gradients over only its own features. Passive logits and residual signals use the explicit `Message`/`InMemoryTransport` path rather than bypassing the communication abstraction.
+## Privacy and security boundary
 
-### `VFLHistGBDT`
+The default VFL protocols provide raw-feature locality, party-local preprocessing/computation, explicit message boundaries, and auditable research transports. They do **not** automatically provide end-to-end differential privacy, PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, or malicious-party security.
 
-A vertical histogram-gradient-boosting research implementation. Every party fits and retains its own training-derived quantile-bin representation. Passive parties receive the required target-derived gradient/Hessian signals, compute local aggregate histogram candidates, and send aggregate gradient/Hessian/count statistics plus opaque feature/bin references. The active party selects a split; the owning party resolves its private numeric threshold and performs routing locally. Validation and test rows reuse the training-derived local routing state rather than refitting held-out bins.
+Sensitive derived signals—including gradients, Hessians, logits, residuals, entity membership, routing information, and split statistics—may leak information depending on the observer and protocol.
 
-Centralized models exist only as **NON-FEDERATED BASELINES** for research comparison and are never relabelled as VFL. The centralized baseline API explicitly supports every Bank-anchored party subset as well as Bank-only and all-party comparisons for logistic and histogram-gradient-boosting models.
+VertiMosaic v0.2.0 also includes **optional, explicitly scoped research mechanisms**:
 
-## :test_tube: Benchmark Modes
+- `ClippedGaussianDPBackend` for message-level L2 clipping, Gaussian noise, zCDP composition, and `(epsilon, delta)` conversion;
+- `PairwiseMaskSecureAggregation` as an honest-but-curious secure-sum reference primitive;
+- `AdditiveSecretSharingSum` for additive-share sum experiments;
+- `OpenMinedPSIBackend` as an optional PSI adapter; and
+- `PaillierHomomorphicSum` for bounded additive homomorphic-sum experiments.
 
-- **`observed_target_external`** — Bank is the anchor population and uses the published observed default target; external profiles are linked target-blind.
-- **`distributed_signal_external`** — real transformed source-domain features are linked first, then a clearly disclosed semi-synthetic target depends on all four parties.
-- **`synthetic_scale`** — fully controlled scaling, overlap, dropout, drift, noise, and distributed-signal experiments.
-- **`ieee_cis_linked`** — optional genuinely linked two-party VFL benchmark using authorized local IEEE-CIS transaction and identity files joined by `TransactionID`; restricted source files are never downloaded, committed, or redistributed by VertiMosaic.
+None of these primitives is silently enabled in the default VFL algorithms, and their presence must not be interpreted as a blanket "secure VFL" guarantee. See [`docs/threat_model.md`](docs/threat_model.md), [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md), [`docs/privacy_backends.md`](docs/privacy_backends.md), and [`docs/privacy_experiments.md`](docs/privacy_experiments.md).
 
-Synthetic scaling uses the full **10K / 30K / 50K / 100K / 250K** grid. External benchmarking runs at the **actual available Bank anchor size** and records preparation, alignment, training, inference, memory, communication, and metric fields in `benchmarks/results.csv`; it does not invent an external row count.
+## Verification and portability
 
-## Partial Entity Overlap
-
-`vertimosaic overlap` evaluates **100%, 90%, 75%, 50%, and 25%** controlled Bank-to-passive overlap. The same deterministic availability realization and the same global train/validation/test entity split are used to compare `intersection_only` against missing-party-aware `availability_indicator` training. The output records both retained coverage and true common-intersection coverage, selects F1 thresholds using validation predictions only, and reports the required performance and communication fields separately for each strategy.
-
-## :lock: Privacy Boundary
-
-The default simulator provides:
-
-- raw-feature locality;
-- party-local computation and preprocessing;
-- explicit protocol boundaries;
-- metadata-only communication auditing; and
-- research pseudonymization.
-
-It is **not cryptographically secure VFL** and does not automatically provide PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, malicious-party security, or formal differential privacy.
-
-Gradients, Hessians, local logits, residuals, entity membership, routing information, and derived split statistics may leak information. See [`docs/threat_model.md`](docs/threat_model.md) and [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md).
-
-## :card_file_box: External Data and Provenance
-
-VertiMosaic grounds its four-industry external benchmark in the following public datasets:
-
-| Industry / party | External dataset | Source ID | Role in VertiMosaic |
-|---|---|---:|---|
-| **Bank** | UCI **Default of Credit Card Clients** | UCI **350** | Financial/payment behaviour and the observed default target used by the active party |
-| **Telecom** | UCI **Iranian Churn** | UCI **563** | Telecom, customer-service, usage and churn-related features |
-| **Insurance** | OpenML **`freMTPL2freq`** + **`freMTPL2sev`** | **41214** + **41215** | Motor-insurance claim frequency, severity and risk-related features |
-| **Retail** | UCI **Online Retail** | UCI **352** | Transaction and purchase behaviour, aggregated to customer level |
-
-Conceptually, the benchmark creates an aligned research profile across the four parties:
-
-```text
-Bank customer
-    ↕
-Telecom profile
-    ↕
-Insurance profile
-    ↕
-Retail profile
-```
-
-**Important:** these four public datasets do **not** describe the same real people. VertiMosaic preprocesses them independently and connects the four industry profiles only through an **explicitly semi-synthetic, target-blind linkage mechanism** for the cross-industry benchmark. The resulting linked profile is therefore a research construction, not a claim that the original Bank, Telecom, Insurance, and Retail records belong to the same real customers.
-
-The **Bank** dataset acts as the anchor population in `observed_target_external` mode and provides the published observed default target. In `distributed_signal_external` mode, transformed source-domain features are linked first and the semi-synthetic target is generated only after linked profiles are formed.
-
-The **Retail** source is aggregated to customer level using an explicit source-time feature cutoff before cross-domain linkage, so post-cutoff transactions are excluded from the benchmark snapshot.
-
-The optional **IEEE-CIS linked benchmark** is separate from the four-industry benchmark. It uses authorized local IEEE-CIS transaction and identity files joined through the exact `TransactionID` intersection and serves as a genuinely linked two-party sanity benchmark; VertiMosaic does not download or redistribute those competition files.
-
-Dataset licensing remains separate from the Apache-2.0 source-code license; see [`DATA_LICENSES.md`](DATA_LICENSES.md). `vertimosaic datasets verify` checks static UCI attribution fields and queries OpenML's official JSON metadata API for the two insurance licenses. Verification fails conservatively when required provider license metadata cannot be obtained.
-
-Each retrieved source capture records a SHA-256 content checksum before transformation, sampling, or temporal cutoff as applicable, plus raw/processed row counts and per-source license metadata. Processed feature artifacts have a separately scoped SHA-256 checksum; source-capture hashes are not presented as provider-published file checksums.
-
-TRAIN-fitted party preprocessors are persisted for external experiments so validation and test transformations reuse the learned local preprocessing state rather than fitting on held-out rows.
-
-## :bar_chart: Evaluation and Reproducibility
-
-Entity-level splits default to **70% train / 15% validation / 15% test**. Threshold selection uses validation data only.
-
-Test evaluation supports:
-
-- ROC-AUC and PR-AUC
-- precision, recall, F1, and balanced accuracy
-- log loss and Brier score
-- expected calibration error (ECE)
-- confusion counts
-- deterministic bootstrap intervals
-- paired bootstrap differences
-
-Normal research runs use **1,000 deterministic bootstrap replicates** where practical; smoke CI uses **100**. Important baseline comparisons report both ROC-AUC and PR-AUC paired deltas with 95% intervals from the same paired resamples. No benchmark conclusion is hard-coded. Negative and uncertain findings are retained. Communication quantities are **simulated payload estimates**, not measured network traffic or latency.
-
-Every experiment run bundle records `config.yaml`, dataset/linkage provenance, environment and dependency versions, measured metrics, predictions, training history, communication metadata, feature provenance, artifact hashes, configuration hash, timestamps, seed, and Git SHA under `runs/<run_id>/`.
-
-## :white_check_mark: Verification
+Core verification:
 
 ```bash
 ruff check .
 ruff format --check .
 mypy src/vertimosaic
 pytest -q --cov=vertimosaic --cov-report=term-missing
-bandit -r src
+bandit -r src -q
 pip-audit
-vertimosaic demo --rows 2000 --seed 42
-python scripts/reproduce_paper.py --smoke
 python -m build
 twine check dist/*
 ```
 
-Protocol-critical modules target at least **90% coverage**; coverage is not inflated merely to chase 100%.
+CI exercises Python 3.11/3.12, protocol-critical coverage, paper/reproduction smoke paths, privacy audits, remote transport measurement, package validation, CodeQL, dependency audit/SBOM generation, optional crypto backends, and portability smoke checks on Linux ARM64, macOS, and Windows. Protocol-critical modules target at least **90% coverage**.
 
-## :books: Documentation
+## Documentation
 
-Detailed design and research notes are available in:
+- [`docs/architecture.md`](docs/architecture.md) — architecture and component boundaries
+- [`docs/protocol.md`](docs/protocol.md) — reference protocol details
+- [`docs/formal_benchmark.md`](docs/formal_benchmark.md) — benchmark matrix and interpretation boundaries
+- [`docs/linked_benchmarks.md`](docs/linked_benchmarks.md) — exact-linked and semi-synthetic benchmark taxonomy
+- [`docs/datasets.md`](docs/datasets.md) — source datasets
+- [`docs/linkage.md`](docs/linkage.md) — linkage design
+- [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md) — privacy claim boundaries
+- [`docs/privacy_backends.md`](docs/privacy_backends.md) — optional privacy/crypto research mechanisms
+- [`docs/privacy_experiments.md`](docs/privacy_experiments.md) — empirical privacy research
+- [`docs/threat_model.md`](docs/threat_model.md) — adversary and non-goals
+- [`docs/reproducibility.md`](docs/reproducibility.md) — experiment reproducibility
+- [`docs/independent_reproduction.md`](docs/independent_reproduction.md) — external reproduction procedure
+- [`docs/limitations.md`](docs/limitations.md) — known limitations
+- [`docs/release_policy.md`](docs/release_policy.md) — release policy
+- [`paper/experiment_manifest.md`](paper/experiment_manifest.md) — paper experiment manifest
 
-- [`docs/architecture.md`](docs/architecture.md)
-- [`docs/protocol.md`](docs/protocol.md)
-- [`docs/vertical_vs_horizontal_fl.md`](docs/vertical_vs_horizontal_fl.md)
-- [`docs/datasets.md`](docs/datasets.md)
-- [`docs/linkage.md`](docs/linkage.md)
-- [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md)
-- [`docs/threat_model.md`](docs/threat_model.md)
-- [`docs/reproducibility.md`](docs/reproducibility.md)
-- [`docs/limitations.md`](docs/limitations.md)
-- [`paper/experiment_manifest.md`](paper/experiment_manifest.md)
+## Citation
 
-## :page_facing_up: Citation
-
-If you use VertiMosaic in research or development, please cite the software using the repository's [`CITATION.cff`](CITATION.cff):
+If you use VertiMosaic in research or development, cite the software using [`CITATION.cff`](CITATION.cff). GitHub also exposes a **Cite this repository** action from that file.
 
 ```text
 VertiMosaic
 Saurav Singla
-Version 0.1.0
+Version 0.2.0
 Apache-2.0
 https://github.com/sauravsingla/VertiMosaic
 ```
 
-GitHub also exposes a **Cite this repository** action based on `CITATION.cff`.
-
-## :balance_scale: License
+## License
 
 VertiMosaic source code is licensed under the **Apache License 2.0**. Dataset licenses and provider terms remain separate; see [`DATA_LICENSES.md`](DATA_LICENSES.md).
