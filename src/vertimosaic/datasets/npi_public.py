@@ -19,7 +19,8 @@ def _normalized_npi(series: pd.Series, *, source: str) -> pd.Series:
 
 
 def _frame_digest(frame: pd.DataFrame) -> str:
-    canonical = frame.sort_index(axis=1).sort_values(list(frame.columns[:1])).reset_index(drop=True)
+    first_column = str(frame.columns[0])
+    canonical = frame.sort_index(axis=1).sort_values(first_column).reset_index(drop=True)
     payload = canonical.to_csv(index=False, lineterminator="\n").encode("utf-8")
     return sha256(payload).hexdigest()
 
@@ -114,7 +115,11 @@ def build_npi_linked_frames(
 
     prior_agg = (
         prior.groupby("__npi", sort=True)["__amount"]
-        .agg(prior_payment_count="size", prior_payment_sum="sum", prior_payment_mean="mean")
+        .agg(
+            prior_payment_count="size",
+            prior_payment_sum="sum",
+            prior_payment_mean="mean",
+        )
         .reset_index()
     )
     prior_agg = prior_agg[prior_agg["prior_payment_count"] >= min_prior_payment_records]
@@ -158,9 +163,10 @@ def build_npi_linked_frames(
     active = linked[
         ["prior_payment_count", "prior_payment_sum", "prior_payment_mean"]
     ].copy()
-    nppes_names = [column for column in linked.columns if column in set(nppes_feature_columns)]
-    care_names = [column for column in linked.columns if column in set(care_feature_columns)]
-    # Handle source-column name collisions created by pandas merge suffixes.
+    nppes_requested = set(nppes_feature_columns)
+    care_requested = set(care_feature_columns)
+    nppes_names = [column for column in linked.columns if column in nppes_requested]
+    care_names = [column for column in linked.columns if column in care_requested]
     if len(nppes_names) != len(nppes_feature_columns):
         nppes_names = [
             f"{column}__nppes" if f"{column}__nppes" in linked.columns else column
