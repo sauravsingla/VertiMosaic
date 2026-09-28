@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   id-token: write
+  attestations: write
 
 concurrency:
   group: pypi-${{ github.ref }}
@@ -16,7 +17,7 @@ concurrency:
 
 jobs:
   publish:
-    name: Build, publish, and release
+    name: Build, attest, publish, and release
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -61,6 +62,11 @@ jobs:
       - name: Validate distributions
         run: python -m twine check dist/*
 
+      - name: Generate Sigstore-backed GitHub provenance attestations
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: 'dist/*'
+
       - name: Publish to PyPI with Trusted Publishing
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
@@ -87,6 +93,7 @@ jobs:
           - Hugging Face Dataset: https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark
           - Hugging Face Space: https://huggingface.co/spaces/sauravsingla08/VertiMosaic
           - Source: https://github.com/sauravsingla/VertiMosaic
+          - Build provenance: GitHub artifact attestation for wheel and source distribution
 
           The GitHub release is created after successful PyPI publication so a connected Zenodo repository can archive the released source version.
           EOF
