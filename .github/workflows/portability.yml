@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install .
+      - run: python -m pip install ".[dev]"
       - run: vertimosaic --help
       - run: vertimosaic demo --rows 400 --seed 42
       - run: python -m pytest -q tests/test_demo.py tests/test_formal_benchmark.py tests/test_privacy_backends.py
