@@ -370,6 +370,8 @@ class VFLLogisticRegression:
             raise ValueError("inference party names must be unique")
         unknown = set(by_name) - set(self.trained_party_names_)
         if unknown:
+            if len(unknown) == 1:
+                raise ValueError(f"unknown inference party: {next(iter(unknown))}")
             raise ValueError(f"unknown inference parties: {sorted(unknown)}")
         if self.active_party_name_ not in by_name:
             raise ValueError("the active party cannot be omitted at inference")
