@@ -190,6 +190,7 @@ def run_dropout_study(
         learning_rate=0.08,
         max_iter=max_iter,
         l2=1e-3,
+        missing_party_policy="zero_contribution",
         seed=seed,
     )
     full_start = time.perf_counter()
