@@ -10,8 +10,6 @@ import numpy as np
 @runtime_checkable
 class _PartyLike(Protocol):
     name: str
-    _entity_ids: np.ndarray | None
-    _entity_digest: str | None
 
     @property
     def n_rows(self) -> int: ...
@@ -56,8 +54,12 @@ def bind_entity_ids(party: _PartyLike, entity_ids: Sequence[object] | np.ndarray
             f"entity_ids length for party {party.name!r} ({len(values)}) does not match "
             f"its row count ({party.n_rows})"
         )
-    party._entity_ids = values
-    party._entity_digest = ordered_entity_digest(values)
+    setattr(party, "_entity_ids", values)  # noqa: B010 - protocol metadata binding
+    setattr(  # noqa: B010 - protocol metadata binding
+        party,
+        "_entity_digest",
+        ordered_entity_digest(values),
+    )
 
 
 def entity_ids_for(party: _PartyLike) -> np.ndarray | None:
