@@ -37,6 +37,11 @@ jobs:
             --logistic-max-iter 150 \
             --gbdt-estimators 8 \
             --output benchmarks/formal_comparison.csv
+      - name: Measure separate-process serialized remote transport
+        run: >-
+          vertimosaic-remote-benchmark
+          --messages 20 --vector-size 4096 --seed 42
+          --output benchmarks/remote_transport.json
       - name: Build install/environment reproduction bundle
         run: |
           vertimosaic-reproduce \
@@ -47,6 +52,11 @@ jobs:
             --output release-evidence/reproduction
       - name: Run empirical privacy audit
         run: python scripts/run_privacy_audit.py --rows 1200 --seed 42 --output reports/privacy_audit.json
+      - name: Run advanced protocol-message privacy audit
+        run: >-
+          vertimosaic-advanced-privacy-audit
+          --rows 1200 --seed 42
+          --output reports/advanced_privacy_audit.json
       - name: Run full multi-seed privacy research
         run: >-
           python scripts/run_privacy_research.py
@@ -66,7 +76,7 @@ jobs:
             results reports benchmarks paper/figures paper/tables runs \
             reproducibility/requirements-py312.lock 2>/dev/null || \
           tar -czf vertimosaic-release-evidence.tar.gz \
-            release-evidence benchmarks reproducibility/requirements-py312.lock
+            release-evidence benchmarks reports reproducibility/requirements-py312.lock
           sha256sum vertimosaic-release-evidence.tar.gz > vertimosaic-release-evidence.tar.gz.sha256
       - name: Publish GitHub Release assets for tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -76,8 +86,6 @@ jobs:
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || \
             gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
-          # Deliberately omit --clobber: existing assets make the workflow fail instead
-          # of silently mutating an already-published evidence point.
           gh release upload "$TAG" \
             vertimosaic-release-evidence.tar.gz \
             vertimosaic-release-evidence.tar.gz.sha256 \
@@ -85,4 +93,9 @@ jobs:
             release-evidence/pip-freeze.txt \
             benchmarks/formal_comparison.csv \
             benchmarks/formal_comparison.json \
-            benchmarks/formal_comparison.md
+            benchmarks/formal_comparison.md \
+            benchmarks/remote_transport.json \
+            reports/privacy_audit.json \
+            reports/advanced_privacy_audit.json \
+            reports/privacy_research.json \
+            reports/privacy_research_summary.csv
