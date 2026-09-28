@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Mypy fix once
+
+on:
+  push:
+    branches:
+      - codex/v0.2-release-hardening
+    paths:
+      - .github/workflows/mypy-fix-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: codex/v0.2-release-hardening
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Patch exact mypy findings
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          remote = Path("src/vertimosaic/experiments/remote_benchmark.py")
+          text = remote.read_text(encoding="utf-8")
+          old = '''    host, port = server.server_address\n    port_queue.put((host, port))'''
+          new = '''    host = str(server.server_address[0])\n    port = int(server.server_address[1])\n    port_queue.put((host, port))'''
+          if old not in text:
+              raise SystemExit("remote server_address mypy target not found")
+          remote.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          formal = Path("src/vertimosaic/experiments/formal_benchmark.py")
+          text = formal.read_text(encoding="utf-8")
+          old = '''    common = dict(\n        train_active=train_active,\n        train_passive=train_passive,\n        validation_active=validation_active,\n        validation_passive=validation_passive,\n        test_active=test_active,\n        test_passive=test_passive,\n        seed=seed,\n    )\n    records = [\n        _non_federated_row(\n            protocol="centralized_all_features",\n            all_features=True,\n            **common,\n        ),\n        _non_federated_row(\n            protocol="single_party_bank",\n            all_features=False,\n            **common,\n        ),\n        _vfl_row(\n            model_name="logistic",\n            logistic_max_iter=logistic_max_iter,\n            gbdt_estimators=gbdt_estimators,\n            **common,\n        ),\n        _vfl_row(\n            model_name="vfl-hist-gbdt",\n            logistic_max_iter=logistic_max_iter,\n            gbdt_estimators=gbdt_estimators,\n            **common,\n        ),\n    ]'''
+          new = '''    records = [\n        _non_federated_row(\n            protocol="centralized_all_features",\n            train_active=train_active,\n            train_passive=train_passive,\n            validation_active=validation_active,\n            validation_passive=validation_passive,\n            test_active=test_active,\n            test_passive=test_passive,\n            seed=seed,\n            all_features=True,\n        ),\n        _non_federated_row(\n            protocol="single_party_bank",\n            train_active=train_active,\n            train_passive=train_passive,\n            validation_active=validation_active,\n            validation_passive=validation_passive,\n            test_active=test_active,\n            test_passive=test_passive,\n            seed=seed,\n            all_features=False,\n        ),\n        _vfl_row(\n            model_name="logistic",\n            train_active=train_active,\n            train_passive=train_passive,\n            validation_active=validation_active,\n            validation_passive=validation_passive,\n            test_active=test_active,\n            test_passive=test_passive,\n            seed=seed,\n            logistic_max_iter=logistic_max_iter,\n            gbdt_estimators=gbdt_estimators,\n        ),\n        _vfl_row(\n            model_name="vfl-hist-gbdt",\n            train_active=train_active,\n            train_passive=train_passive,\n            validation_active=validation_active,\n            validation_passive=validation_passive,\n            test_active=test_active,\n            test_passive=test_passive,\n            seed=seed,\n            logistic_max_iter=logistic_max_iter,\n            gbdt_estimators=gbdt_estimators,\n        ),\n    ]'''
+          if old not in text:
+              raise SystemExit("formal benchmark typed kwargs target not found")
+          formal.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+      - name: Verify style and typing
+        run: |
+          python -m pip install -e ".[dev]"
+          ruff check . --fix
+          ruff format .
+          ruff check .
+          ruff format --check .
+          mypy src/vertimosaic
+      - name: Commit correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No mypy correction needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src
+          git commit -m "Fix v0.2 hardening type checks"
+          git push origin HEAD:codex/v0.2-release-hardening
