@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import platform
 import shlex
@@ -29,7 +30,7 @@ def _required_result(payload: dict[str, Any]) -> None:
         raise ValueError(f"external comparator result is missing fields: {missing}")
     for key in ("roc_auc", "pr_auc", "training_seconds", "inference_seconds"):
         value = float(payload[key])
-        if not (value == value):
+        if not math.isfinite(value):
             raise ValueError(f"external comparator field {key!r} must be finite")
     if not 0.0 <= float(payload["roc_auc"]) <= 1.0:
         raise ValueError("roc_auc must be in [0, 1]")
@@ -61,7 +62,13 @@ def main() -> None:
         raise ValueError("benchmark manifest must contain 'split' and 'parties' sections")
 
     raw_output = args.output.with_suffix(args.output.suffix + ".raw.json")
-    command = [*shlex.split(args.command), "--manifest", str(manifest), "--output", str(raw_output)]
+    command = [
+        *shlex.split(args.command),
+        "--manifest",
+        str(manifest),
+        "--output",
+        str(raw_output),
+    ]
     started = time.perf_counter()
     completed = subprocess.run(
         command,
@@ -99,7 +106,10 @@ def main() -> None:
         ),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(normalized, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(normalized, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     raw_output.unlink(missing_ok=True)
 
 
