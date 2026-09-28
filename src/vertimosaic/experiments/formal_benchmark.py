@@ -189,11 +189,16 @@ def _vfl_row(
     train_probability = model.predict_proba([train_active, *train_passive])[:, 1]
     metrics = binary_metrics(test_active.labels, test_probability, threshold=threshold)
     membership_auc, membership_advantage = _membership(train_probability, test_probability)
-    privacy_surface = (
-        "raw features stay party-local; passive parties receive residual-derived signals and send local logits"
-        if model_name == "logistic"
-        else "raw features and numeric split thresholds stay party-local; parties receive target-derived gradient/Hessian signals and routing information is exposed"
-    )
+    if model_name == "logistic":
+        privacy_surface = (
+            "raw features stay party-local; passive parties receive residual-derived "
+            "signals and send local logits"
+        )
+    else:
+        privacy_surface = (
+            "raw features and numeric split thresholds stay party-local; parties receive "
+            "target-derived gradient/Hessian signals and routing information is exposed"
+        )
     return {
         "protocol": "vfl_logistic" if model_name == "logistic" else "vfl_hist_gbdt",
         "reference_model": model_name,
@@ -314,8 +319,7 @@ def run_formal_benchmark(
         "Centralized rows are explicitly non-federated research baselines. "
         "Communication values are protocol payload accounting. Peak RSS is sampled "
         "throughout training rather than inferred from before/after snapshots. "
-        "Membership leakage is a simple empirical attack baseline.\n\n"
-        + _markdown_table(frame),
+        "Membership leakage is a simple empirical attack baseline.\n\n" + _markdown_table(frame),
         encoding="utf-8",
     )
     metadata = {

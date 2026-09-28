@@ -23,8 +23,8 @@ from vertimosaic.privacy.backends import (
 from vertimosaic.privacy.crypto import (
     AdditiveSecretSharingSum,
     OpenMinedPSIBackend,
-    PairwiseMaskSecureAggregation,
     PaillierHomomorphicSum,
+    PairwiseMaskSecureAggregation,
 )
 from vertimosaic.privacy.experiments import run_privacy_audit
 from vertimosaic.privacy.research import (

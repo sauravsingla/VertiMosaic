@@ -219,7 +219,8 @@ class OpenMinedPSIBackend:
     def security_scope(self) -> str:
         return (
             "optional OpenMined ECDH PSI adapter; PSI protects set-intersection protocol "
-            "inputs subject to the upstream implementation's threat model, not VFL training messages"
+            "inputs subject to the upstream implementation's threat model, not VFL "
+            "training messages"
         )
 
 

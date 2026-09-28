@@ -151,9 +151,7 @@ def build_movielens_user_parties(
     )
     flags = _genre_flags(early, genres)
     early = pd.concat([early.reset_index(drop=True), flags.reset_index(drop=True)], axis=1)
-    early["high_rating"] = (
-        pd.to_numeric(early["Rating"], errors="coerce") >= 4.0
-    ).astype(float)
+    early["high_rating"] = (pd.to_numeric(early["Rating"], errors="coerce") >= 4.0).astype(float)
     aggregate_spec: dict[str, tuple[str, str]] = {
         "rating_count": ("Rating", "size"),
         "mean_rating": ("Rating", "mean"),
@@ -257,8 +255,7 @@ def run_movielens_linked_experiment(
     predictions_path = output.with_name(output.stem + "_predictions.csv")
     test_ids = entity_ids.iloc[split.test].to_numpy()
     pseudonyms = [
-        sha256(f"movielens1m:{int(user_id)}".encode()).hexdigest()[:20]
-        for user_id in test_ids
+        sha256(f"movielens1m:{int(user_id)}".encode()).hexdigest()[:20] for user_id in test_ids
     ]
     pd.DataFrame(
         {

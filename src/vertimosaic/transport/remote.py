@@ -254,8 +254,12 @@ class RemoteHTTPTransport(InMemoryTransport):
             "response_body_bytes": sum(event.response_body_bytes for event in events),
             "response_header_bytes": sum(event.response_header_bytes for event in events),
             "measured_application_bytes": sum(event.measured_application_bytes for event in events),
-            "round_trip_p50_seconds": float(np.percentile(latencies, 50)) if len(latencies) else 0.0,
-            "round_trip_p95_seconds": float(np.percentile(latencies, 95)) if len(latencies) else 0.0,
+            "round_trip_p50_seconds": (
+                float(np.percentile(latencies, 50)) if len(latencies) else 0.0
+            ),
+            "round_trip_p95_seconds": (
+                float(np.percentile(latencies, 95)) if len(latencies) else 0.0
+            ),
             "tls_record_bytes_measured": False,
             "scope": (
                 "serialized HTTP application bytes and round-trip latency; excludes TLS record, "
@@ -355,7 +359,9 @@ class RemoteHTTPTransport(InMemoryTransport):
                         response_key_id = response.headers.get("X-VertiMosaic-Key-ID")
                         response_signature = response.headers.get("X-VertiMosaic-Signature")
                         if response_key_id != key_id or response_signature is None:
-                            raise RuntimeError("signed request received an unsigned remote response")
+                            raise RuntimeError(
+                                "signed request received an unsigned remote response"
+                            )
                         if not hmac.compare_digest(
                             response_signature,
                             _sign(secret, response_body),
@@ -378,7 +384,9 @@ class RemoteHTTPTransport(InMemoryTransport):
                     ) from exc
                 time.sleep(self.backoff_seconds * (2**attempt))
         else:
-            raise RuntimeError("remote transport retry loop terminated unexpectedly") from last_error
+            raise RuntimeError(
+                "remote transport retry loop terminated unexpectedly"
+            ) from last_error
 
         message = Message(
             message_type=message_type,
@@ -578,9 +586,7 @@ class ReferenceRelayServer(ThreadingHTTPServer):
         self.rate_limit_per_minute = rate_limit_per_minute
         self.external_rate_limiter = external_rate_limiter
         self.request_handler = request_handler
-        self.idempotency_cache: OrderedDict[
-            str, tuple[float, str, dict[str, Any]]
-        ] = OrderedDict()
+        self.idempotency_cache: OrderedDict[str, tuple[float, str, dict[str, Any]]] = OrderedDict()
         self._request_times: dict[str, deque[float]] = {}
         self._security_lock = threading.Lock()
 

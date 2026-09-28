@@ -6,8 +6,8 @@ import pytest
 from vertimosaic.privacy.crypto import (
     AdditiveSecretSharingSum,
     OpenMinedPSIBackend,
-    PairwiseMaskSecureAggregation,
     PaillierHomomorphicSum,
+    PairwiseMaskSecureAggregation,
 )
 
 
@@ -49,7 +49,9 @@ def test_additive_secret_sharing_reconstructs_signed_vector() -> None:
     assert "not a general MPC" in backend.security_scope
 
 
-def test_optional_psi_backend_fails_closed_without_dependency(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_optional_psi_backend_fails_closed_without_dependency(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def missing(name: str) -> object:
         raise ImportError(name)
 
