@@ -72,7 +72,7 @@ If the project is useful, the best support is simple: **run it, reproduce it, an
 
 The **[VertiMosaic VFL Research Explorer](https://huggingface.co/spaces/sauravsingla08/VertiMosaic)** provides an interactive view of the maintained synthetic benchmark evidence, including model comparison, party contribution, entity overlap, party dropout, feature drift, and systems/provenance views.
 
-It is generated from the repository benchmark pipeline rather than a hand-entered demo: the current Space build uses a **2,000-row core benchmark**, **1,200-row robustness studies**, **seed 42**, four synthetic party roles, and CPU reference execution. See [`huggingface/build_space.py`](huggingface/build_space.py) for the evidence-generation path.
+It is generated from the repository benchmark pipeline rather than a hand-entered demo. The Space build configuration in this repository uses a **2,000-row core benchmark**, **1,200-row robustness studies**, **seed 42**, four synthetic party roles, and CPU reference execution. See [`huggingface/build_space.py`](huggingface/build_space.py) for the evidence-generation path.
 
 <p align="center">
   <a href="https://huggingface.co/spaces/sauravsingla08/VertiMosaic">
@@ -129,7 +129,6 @@ Maintainer-generated release evidence demonstrates reproducibility of the mainta
 | Inspect privacy limitations | [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md) |
 | Reproduce the maintained evidence bundle | `vertimosaic-reproduce` |
 | Try separate services with HTTPS/mTLS | [`deploy/compose/README.md`](deploy/compose/README.md) |
-| Explore the live project surface | [Hugging Face Space](https://huggingface.co/spaces/sauravsingla08/VertiMosaic) |
 
 ## Core scope
 
