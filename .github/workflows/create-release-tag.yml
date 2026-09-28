@@ -74,14 +74,14 @@ jobs:
             git push origin "refs/tags/${TAG}"
             echo "created=true" >> "$GITHUB_OUTPUT"
           fi
-      - name: Dispatch Trusted Publishing and immutable evidence workflows
+      - name: Dispatch Trusted Publishing workflow
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
-          # Pushes made with GITHUB_TOKEN are intentionally not relied on to fan out.
-          # workflow_dispatch is explicitly allowed to trigger downstream workflows.
+          # A tag pushed with GITHUB_TOKEN does not fan out to other workflows.
+          # Dispatch publication explicitly; publication then creates the GitHub
+          # Release and dispatches release-evidence only after PyPI succeeds.
           gh workflow run publish-pypi.yml --ref "${TAG}"
-          gh workflow run release-evidence.yml --ref "${TAG}"
