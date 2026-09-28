@@ -9,7 +9,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import psutil
 from sklearn.linear_model import LogisticRegression
 
 from vertimosaic.datasets import make_vertical_synthetic
@@ -21,14 +20,11 @@ from vertimosaic.evaluation import (
 )
 from vertimosaic.experiments.overlap_study import run_overlap_study
 from vertimosaic.experiments.pipeline import slice_parties
+from vertimosaic.experiments.resources import PeakRSSSampler
 from vertimosaic.experiments.studies import run_dropout_study
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.parties import ActiveParty, PassiveParty
 from vertimosaic.privacy import confidence_membership_inference
-
-
-def _peak_rss(before: int, process: psutil.Process) -> int:
-    return int(max(before, process.memory_info().rss))
 
 
 def _matrix(parties: list[PassiveParty]) -> np.ndarray:
@@ -77,7 +73,6 @@ def _non_federated_row(
     seed: int,
     all_features: bool,
 ) -> dict[str, Any]:
-    process = psutil.Process()
     train_parties: list[PassiveParty] = (
         [train_active, *train_passive] if all_features else [train_active]
     )
@@ -91,11 +86,10 @@ def _non_federated_row(
     x_validation = _matrix(validation_parties)
     x_test = _matrix(test_parties)
     estimator = LogisticRegression(max_iter=1000, random_state=seed)
-    rss_before = process.memory_info().rss
     start = time.perf_counter()
-    estimator.fit(x_train, train_active.labels)
+    with PeakRSSSampler(interval_seconds=0.005) as memory:
+        estimator.fit(x_train, train_active.labels)
     training_seconds = time.perf_counter() - start
-    peak_rss_bytes = _peak_rss(rss_before, process)
     validation_probability = estimator.predict_proba(x_validation)[:, 1]
     threshold = select_f1_threshold(validation_active.labels, validation_probability)
     inference_start = time.perf_counter()
@@ -114,7 +108,8 @@ def _non_federated_row(
         "brier": metrics["brier"],
         "training_seconds": training_seconds,
         "inference_seconds": inference_seconds,
-        "peak_rss_bytes": peak_rss_bytes,
+        "peak_rss_bytes": memory.peak_rss_bytes,
+        "peak_rss_method": "sampled_process_rss_5ms",
         "estimated_communication_bytes": 0,
         "communication_message_count": 0,
         "overlap_50_roc_auc": np.nan,
@@ -145,7 +140,6 @@ def _vfl_row(
     logistic_max_iter: int,
     gbdt_estimators: int,
 ) -> dict[str, Any]:
-    process = psutil.Process()
     if model_name == "logistic":
         model: VFLLogisticRegression | VFLHistGBDT = VFLLogisticRegression(
             learning_rate=0.08,
@@ -165,14 +159,13 @@ def _vfl_row(
     else:
         raise ValueError(f"unknown VFL model: {model_name}")
 
-    rss_before = process.memory_info().rss
     start = time.perf_counter()
-    if getattr(model, "early_stopping_rounds", None) is None:
-        model.fit(train_active, train_passive)
-    else:
-        model.fit(train_active, train_passive, validation_active, validation_passive)
+    with PeakRSSSampler(interval_seconds=0.005) as memory:
+        if getattr(model, "early_stopping_rounds", None) is None:
+            model.fit(train_active, train_passive)
+        else:
+            model.fit(train_active, train_passive, validation_active, validation_passive)
     training_seconds = time.perf_counter() - start
-    peak_rss_bytes = _peak_rss(rss_before, process)
     communication = communication_totals(model.transport.audit_log)
 
     if isinstance(model, VFLHistGBDT):
@@ -182,7 +175,9 @@ def _vfl_row(
             [test_active, *test_passive],
         ):
             for source_party, target_party in zip(
-                training_parties, evaluation_parties, strict=True
+                training_parties,
+                evaluation_parties,
+                strict=True,
             ):
                 source_party.share_histogram_routing_state_with(target_party)
 
@@ -194,16 +189,11 @@ def _vfl_row(
     train_probability = model.predict_proba([train_active, *train_passive])[:, 1]
     metrics = binary_metrics(test_active.labels, test_probability, threshold=threshold)
     membership_auc, membership_advantage = _membership(train_probability, test_probability)
-    if model_name == "logistic":
-        privacy_surface = (
-            "raw features stay party-local; passive parties receive residual-derived "
-            "signals and send local logits"
-        )
-    else:
-        privacy_surface = (
-            "raw features and numeric split thresholds stay party-local; parties receive "
-            "target-derived gradient/Hessian signals and routing information is exposed"
-        )
+    privacy_surface = (
+        "raw features stay party-local; passive parties receive residual-derived signals and send local logits"
+        if model_name == "logistic"
+        else "raw features and numeric split thresholds stay party-local; parties receive target-derived gradient/Hessian signals and routing information is exposed"
+    )
     return {
         "protocol": "vfl_logistic" if model_name == "logistic" else "vfl_hist_gbdt",
         "reference_model": model_name,
@@ -214,7 +204,8 @@ def _vfl_row(
         "brier": metrics["brier"],
         "training_seconds": training_seconds,
         "inference_seconds": inference_seconds,
-        "peak_rss_bytes": peak_rss_bytes,
+        "peak_rss_bytes": memory.peak_rss_bytes,
+        "peak_rss_method": "sampled_process_rss_5ms",
         "estimated_communication_bytes": int(model.transport.estimated_payload_bytes),
         "communication_message_count": int(communication["message_count"]),
         "overlap_50_roc_auc": np.nan,
@@ -237,12 +228,7 @@ def run_formal_benchmark(
     gbdt_estimators: int = 12,
     output: Path = Path("benchmarks/formal_comparison.csv"),
 ) -> pd.DataFrame:
-    """Create a directly comparable four-protocol research benchmark table.
-
-    The centralized and single-party rows are explicitly NON-FEDERATED baselines.
-    VFL communication is protocol-message payload accounting, not packet captures.
-    Privacy leakage is an empirical confidence-membership baseline, not a proof.
-    """
+    """Create a directly comparable four-protocol research benchmark table."""
     if rows < 200:
         raise ValueError("formal benchmark requires at least 200 rows")
     active, passive = make_vertical_synthetic(rows, seed)
@@ -251,59 +237,44 @@ def run_formal_benchmark(
     validation_active, validation_passive = slice_parties(active, passive, split.validation)
     test_active, test_passive = slice_parties(active, passive, split.test)
 
+    common = dict(
+        train_active=train_active,
+        train_passive=train_passive,
+        validation_active=validation_active,
+        validation_passive=validation_passive,
+        test_active=test_active,
+        test_passive=test_passive,
+        seed=seed,
+    )
     records = [
         _non_federated_row(
             protocol="centralized_all_features",
-            train_active=train_active,
-            train_passive=train_passive,
-            validation_active=validation_active,
-            validation_passive=validation_passive,
-            test_active=test_active,
-            test_passive=test_passive,
-            seed=seed,
             all_features=True,
+            **common,
         ),
         _non_federated_row(
             protocol="single_party_bank",
-            train_active=train_active,
-            train_passive=train_passive,
-            validation_active=validation_active,
-            validation_passive=validation_passive,
-            test_active=test_active,
-            test_passive=test_passive,
-            seed=seed,
             all_features=False,
+            **common,
         ),
         _vfl_row(
             model_name="logistic",
-            train_active=train_active,
-            train_passive=train_passive,
-            validation_active=validation_active,
-            validation_passive=validation_passive,
-            test_active=test_active,
-            test_passive=test_passive,
-            seed=seed,
             logistic_max_iter=logistic_max_iter,
             gbdt_estimators=gbdt_estimators,
+            **common,
         ),
         _vfl_row(
             model_name="vfl-hist-gbdt",
-            train_active=train_active,
-            train_passive=train_passive,
-            validation_active=validation_active,
-            validation_passive=validation_passive,
-            test_active=test_active,
-            test_passive=test_passive,
-            seed=seed,
             logistic_max_iter=logistic_max_iter,
             gbdt_estimators=gbdt_estimators,
+            **common,
         ),
     ]
     frame = pd.DataFrame(records)
     frame.insert(1, "rows", rows)
     frame.insert(2, "seed", seed)
-
     output.parent.mkdir(parents=True, exist_ok=True)
+
     if include_robustness:
         for model_name, protocol in (
             ("logistic", "vfl_logistic"),
@@ -318,11 +289,9 @@ def run_formal_benchmark(
                 output=output.parent / f"robustness_overlap_{model_name}.csv",
                 write_run=False,
             )
-            value = float(overlap.iloc[0]["roc_auc"])
             mask = frame["protocol"] == protocol
-            frame.loc[mask, "overlap_50_roc_auc"] = value
+            frame.loc[mask, "overlap_50_roc_auc"] = float(overlap.iloc[0]["roc_auc"])
             frame.loc[mask, "overlap_status"] = "measured: availability_indicator at 50% overlap"
-
         dropout = run_dropout_study(
             rows=max(rows, 400),
             seed=seed,
@@ -335,8 +304,7 @@ def run_formal_benchmark(
             mask = frame["protocol"] == "vfl_logistic"
             frame.loc[mask, "worst_inference_dropout_roc_auc"] = float(inference.min())
             frame.loc[mask, "dropout_status"] = "measured over documented inference scenarios"
-        mask = frame["protocol"] == "vfl_hist_gbdt"
-        frame.loc[mask, "dropout_status"] = (
+        frame.loc[frame["protocol"] == "vfl_hist_gbdt", "dropout_status"] = (
             "trained-party omission is not supported; retrain/evaluate availability separately"
         )
 
@@ -344,8 +312,10 @@ def run_formal_benchmark(
     output.with_suffix(".md").write_text(
         "# VertiMosaic formal benchmark matrix\n\n"
         "Centralized rows are explicitly non-federated research baselines. "
-        "Communication values are protocol payload accounting. Membership leakage is a "
-        "simple confidence-based empirical attack baseline.\n\n" + _markdown_table(frame),
+        "Communication values are protocol payload accounting. Peak RSS is sampled "
+        "throughout training rather than inferred from before/after snapshots. "
+        "Membership leakage is a simple empirical attack baseline.\n\n"
+        + _markdown_table(frame),
         encoding="utf-8",
     )
     metadata = {
@@ -354,6 +324,7 @@ def run_formal_benchmark(
         "include_robustness": include_robustness,
         "logistic_max_iter": logistic_max_iter,
         "gbdt_estimators": gbdt_estimators,
+        "memory_measurement": "process RSS sampled every 5ms during model fitting",
         "claims": {
             "centralized_rows_are_federated": False,
             "communication_is_packet_capture": False,
