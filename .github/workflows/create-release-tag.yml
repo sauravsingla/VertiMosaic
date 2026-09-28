@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   tag:
@@ -45,21 +46,42 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
       - name: Create immutable release tag reference
+        id: tag
         env:
           TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
-          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/tmp/tag.txt 2>/dev/null; then
-            REMOTE_SHA=$(awk '{print $1}' /tmp/tag.txt)
-            if [[ "${REMOTE_SHA}" != "${GITHUB_SHA}" ]]; then
-              echo "Existing ${TAG} points at ${REMOTE_SHA}, not ${GITHUB_SHA}" >&2
+          EXISTING=$(git ls-remote --tags origin "refs/tags/${TAG}^{}" | awk '{print $1}')
+          if [[ -z "${EXISTING}" ]]; then
+            DIRECT=$(git ls-remote --tags origin "refs/tags/${TAG}" | awk '{print $1}')
+            if [[ -n "${DIRECT}" ]]; then
+              git fetch origin "refs/tags/${TAG}:refs/tags/${TAG}"
+              EXISTING=$(git rev-list -n 1 "${TAG}")
+            fi
+          fi
+          if [[ -n "${EXISTING}" ]]; then
+            if [[ "${EXISTING}" != "${GITHUB_SHA}" ]]; then
+              echo "Existing ${TAG} resolves to ${EXISTING}, not ${GITHUB_SHA}" >&2
               exit 1
             fi
-            echo "${TAG} already points at the validated release commit."
-            exit 0
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "${TAG} already resolves to the validated release commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${TAG}" "${GITHUB_SHA}" -m "VertiMosaic ${TAG}"
+            git push origin "refs/tags/${TAG}"
+            echo "created=true" >> "$GITHUB_OUTPUT"
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "${TAG}" "${GITHUB_SHA}" -m "VertiMosaic ${TAG}"
-          git push origin "refs/tags/${TAG}"
+      - name: Dispatch Trusted Publishing and immutable evidence workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Pushes made with GITHUB_TOKEN are intentionally not relied on to fan out.
+          # workflow_dispatch is explicitly allowed to trigger downstream workflows.
+          gh workflow run publish-pypi.yml --ref "${TAG}"
+          gh workflow run release-evidence.yml --ref "${TAG}"
