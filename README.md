@@ -1,11 +1,11 @@
 <h1 align="center">VertiMosaic</h1>
 
 <p align="center">
-  <b>CPU-first Vertical Federated Learning for Heterogeneous Tabular Data</b>
+  <b>Train one model across organizations without pooling their raw tabular features — on CPU.</b>
 </p>
 
 <p align="center">
-  A reproducible VFL research framework with strict entity alignment, exact-linked public benchmarks, auditable communication, explicit privacy boundaries, and release-grade experimental evidence.
+  CPU-first vertical federated learning for aligned entities, heterogeneous feature sets, reproducible experiments, and explicit privacy boundaries.
 </p>
 
 <p align="center">
@@ -19,24 +19,81 @@
   <a href="https://huggingface.co/spaces/sauravsingla08/VertiMosaic"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Live%20Space-FFD21E" alt="Hugging Face Space"></a>
 </p>
 
-VertiMosaic is an open-source **vertical federated learning (VFL)** research framework for tabular data. Different parties retain different feature columns for aligned entities, and the reference protocols request party-local computation instead of pooling passive-party raw feature matrices at the active party.
+## The problem VertiMosaic solves
 
-The project focuses on **protocol correctness, reproducibility, provenance, communication measurement, explicit privacy boundaries, and CPU-friendly reference implementations**. Raw-feature locality is a design property; it is not presented as equivalent to end-to-end cryptographic privacy.
+Many organizations can describe the **same entities** but hold **different feature columns**.
 
-## What is new in v0.3.0
+A bank may know payment behavior. A telecom provider may know service behavior. An insurer may know claims or risk signals. A retailer may know purchase behavior. Pooling all of those raw feature tables into one place may be undesirable, restricted, or simply unrealistic.
 
-VertiMosaic v0.3.0 strengthens the research and protocol surface in several important ways:
+**VertiMosaic is a research framework for studying how those parties can participate in one vertical federated learning workflow while keeping passive-party raw feature matrices local.**
 
-- **order-sensitive entity alignment** so equal-length but differently ordered party rows can be rejected instead of silently treated as aligned;
-- **explicit missing-party behavior** in `VFLLogisticRegression`, with errors by default and zero-contribution fallback only when deliberately enabled for research;
-- a **protected logistic research path** combining PSI-based entity intersection/canonical ordering with clipped-Gaussian residual releases and scoped zCDP accounting;
-- a **real exact-NPI multi-source public benchmark builder** linking provider entities across Open Payments, NPPES, and CMS Care Compare/provider data;
-- a framework-neutral **external-comparator exchange contract** for FATE, SecretFlow, or another VFL framework, without inventing unmeasured third-party results;
-- **independent-reproduction evidence schemas and validation tooling**;
-- four focused tutorials and a separate-service **Docker Compose HTTPS/mTLS deployment example**;
-- immutable release-evidence assets containing canonical results, benchmark outputs, privacy audits, environment metadata, hashes, and reproduction artifacts.
+```text
+                same / aligned entities
+                         │
+       ┌─────────────────┼─────────────────┐
+       │                 │                 │
+     Bank             Telecom          Insurance          Retail
+ features + target     features          features          features
+       │                 │                 │                 │
+       └──────── party-local computation + protocol messages ────────┘
+                         │
+                   joint VFL model
+```
 
-Latest release: **[VertiMosaic v0.3.0](https://github.com/sauravsingla/VertiMosaic/releases/tag/v0.3.0)**.
+The reference protocols exchange model- and training-related signals rather than pooling passive-party raw feature tables at the active party. That is a useful system property, but **it is not the same as a blanket cryptographic or end-to-end privacy guarantee**; VertiMosaic keeps those boundaries explicit.
+
+## Try it in under a minute
+
+VertiMosaic supports Python **3.11 and 3.12** and does not require a GPU.
+
+```bash
+python -m pip install vertimosaic
+vertimosaic demo --rows 2000 --seed 42
+```
+
+The demo runs a CPU-friendly smoke experiment and writes a reproducibility bundle under `runs/<run_id>/`.
+
+Want the code instead of the package?
+
+```bash
+git clone https://github.com/sauravsingla/VertiMosaic.git
+cd VertiMosaic
+python -m pip install -e .
+vertimosaic demo --rows 2000 --seed 42
+```
+
+## Why VertiMosaic?
+
+- **CPU-first** — useful for laptops, CI, GitHub-hosted environments, and reproducible research without dedicated accelerators.
+- **Built for tabular VFL** — reference logistic and histogram-GBDT protocols rather than a generic distributed-training wrapper.
+- **Strict entity alignment** — research paths can reject equal-length but differently ordered party rows instead of silently treating them as aligned.
+- **Auditable communication** — protocol messages, payload accounting, and separate serialized HTTP benchmark paths are measurable.
+- **Real linked public benchmarks** — including exact NPI linkage across multiple US public provider data products and exact multi-table MovieLens linkage.
+- **Explicit privacy boundaries** — raw-feature locality is separated from stronger claims about DP, PSI, MPC, HE, secure aggregation, or malicious-party security.
+- **Reproducibility first** — deterministic runs, release evidence, environment capture, hashes, benchmark outputs, and independent-reproduction schemas.
+
+## Pick your path
+
+| If you want to... | Start here |
+|---|---|
+| Understand VFL quickly | [`tutorials/01_first_vfl_10_minutes.md`](tutorials/01_first_vfl_10_minutes.md) |
+| Run the basic demo | `vertimosaic demo --rows 2000 --seed 42` |
+| Compare centralized / single-party / VFL paths | `vertimosaic-benchmark-matrix` |
+| Run a public exact-linked benchmark | `vertimosaic-linked-movielens` |
+| Inspect privacy limitations before using the framework | [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md) |
+| Reproduce the maintained evidence bundle | `vertimosaic-reproduce` |
+| Try separate services with HTTPS/mTLS | [`deploy/compose/README.md`](deploy/compose/README.md) |
+| Explore the live project surface | [Hugging Face Space](https://huggingface.co/spaces/sauravsingla08/VertiMosaic) |
+
+## What VertiMosaic is — and is not
+
+| VertiMosaic provides | VertiMosaic does not automatically claim |
+|---|---|
+| Party-local raw feature tables in the reference VFL paths | End-to-end cryptographic privacy |
+| Explicit protocol/message boundaries | Protection of every derived signal |
+| CPU-friendly reference implementations | Production-scale distributed infrastructure |
+| Optional PSI / DP / secure-sum / HE research mechanisms | A blanket "secure VFL" guarantee |
+| Reproducible public and synthetic benchmarks | Evidence of real private cross-company collaboration |
 
 ## At a glance
 
@@ -69,24 +126,22 @@ The active party owns the target. Passive parties retain their raw feature matri
 
 `InMemoryTransport` provides deterministic protocol simulation and message auditing. `RemoteHTTPTransport` provides a separate serialized HTTP path with bounded requests/responses, authorization, replay controls, idempotency limits, rate limiting, optional compressed NumPy transport, and signed-message support. The Docker Compose deployment example adds separate services, party-local volumes, HTTPS/mTLS, bearer authorization, health checks, and deterministic sample data. These transport controls do not turn the default learning protocol into malicious-secure VFL.
 
-## Installation
+## What is new in v0.3.0
 
-VertiMosaic supports Python **3.11 and 3.12**.
+VertiMosaic v0.3.0 strengthens the research and protocol surface with:
 
-Install the latest published release:
+- **order-sensitive entity alignment**;
+- **explicit missing-party behavior** in `VFLLogisticRegression`;
+- a **protected logistic research path** combining PSI-based entity intersection/canonical ordering with clipped-Gaussian residual releases and scoped zCDP accounting;
+- a **real exact-NPI multi-source public benchmark builder** linking provider entities across Open Payments, NPPES, and CMS Care Compare/provider data;
+- a framework-neutral **external-comparator exchange contract** for FATE, SecretFlow, or another VFL framework, without inventing unmeasured third-party results;
+- **independent-reproduction evidence schemas and validation tooling**;
+- four focused tutorials and a separate-service **Docker Compose HTTPS/mTLS deployment example**; and
+- immutable release-evidence assets containing canonical results, benchmark outputs, privacy audits, environment metadata, hashes, and reproduction artifacts.
 
-```bash
-python -m pip install vertimosaic
-```
+Latest release: **[VertiMosaic v0.3.0](https://github.com/sauravsingla/VertiMosaic/releases/tag/v0.3.0)**.
 
-For the current repository state:
-
-```bash
-git clone https://github.com/sauravsingla/VertiMosaic.git
-cd VertiMosaic
-python -m pip install --upgrade pip
-python -m pip install -e .
-```
+## Installation and tutorials
 
 For development and verification tooling:
 
@@ -99,17 +154,6 @@ Optional PSI and Paillier adapters:
 ```bash
 python -m pip install -e ".[privacy-crypto]"
 ```
-
-## Quick start
-
-```bash
-vertimosaic --help
-vertimosaic demo --rows 2000 --seed 42
-```
-
-The demo is a smoke experiment and uses **100 bootstrap replicates**. Normal research experiment and benchmark paths use **1,000 bootstrap replicates** where practical. Standard experiment outputs are written as reproducibility bundles under `runs/<run_id>/`.
-
-### Tutorials
 
 Start with the focused walkthroughs:
 
