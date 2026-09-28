@@ -66,7 +66,9 @@ def validate(directory: Path) -> dict[str, object]:
         raise ValueError("reproducer must not be empty")
     if not str(attestation["release_version"]).strip():
         raise ValueError("release_version must not be empty")
-    if bool(attestation["independent"]) and bool(attestation["unpublished_maintainer_changes_used"]):
+    if bool(attestation["independent"]) and bool(
+        attestation["unpublished_maintainer_changes_used"]
+    ):
         raise ValueError(
             "a run using unpublished maintainer changes cannot be indexed as independent"
         )
@@ -89,9 +91,7 @@ def validate(directory: Path) -> dict[str, object]:
     verified: list[str] = []
     for name, expected in sums.items():
         candidate = directory / name
-        if not candidate.is_file():
-            continue
-        if candidate.name == "SHA256SUMS":
+        if not candidate.is_file() or candidate.name == "SHA256SUMS":
             continue
         actual = _sha256(candidate)
         if actual != expected:
