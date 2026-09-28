@@ -66,17 +66,27 @@ python -m pip install -e .
 vertimosaic demo --rows 2000 --seed 42
 ```
 
-## Inspect measured evidence
+## Measured v0.3.0 benchmark snapshot
 
-The **v0.3.0 release** publishes machine-generated evidence from the release source rather than manually entered headline numbers.
+The table below is copied from the **machine-generated v0.3.0 formal benchmark evidence** for the core reference run (**800 rows, seed 42**). The first two rows are explicitly **non-federated baselines**; they are not VFL protocols.
+
+| Model / protocol | Setting | ROC-AUC | PR-AUC | F1 | Train time (s) |
+|---|---|---:|---:|---:|---:|
+| Centralized all features | Non-federated baseline | 0.778613 | 0.776889 | 0.720588 | 0.003723 |
+| Single-party Bank | Non-federated baseline | 0.656642 | 0.624126 | 0.608000 | 0.002952 |
+| `VFLLogisticRegression` | Federated | 0.787246 | 0.785997 | 0.736111 | 0.022221 |
+| `VFLHistGBDT` | Federated | 0.704121 | 0.674868 | 0.662162 | 0.063051 |
+
+These values are a **reproducible reference run, not a cross-framework leaderboard**. Wall-clock time is environment-dependent. The full generated comparison also records inference time, sampled process RSS, protocol payload bytes/message counts, Brier score, and a simple empirical membership-attack baseline. Protocol communication values are application-level payload accounting, not packet captures.
+
+### Inspect the release evidence
 
 | Evidence | What it contains |
 |---|---|
+| [`formal_comparison.md`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/formal_comparison.md) | Full human-readable formal comparison |
 | [`canonical-results.json`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/canonical-results.json) | Canonical release-result summary |
-| [`formal_comparison.md`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/formal_comparison.md) | Centralized, single-party, and VFL comparison output |
 | [`remote_transport.json`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/remote_transport.json) | Serialized remote-transport measurements |
-| [`privacy_audit.json`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/privacy_audit.json) | Reproducible privacy-attack baseline |
-| [Full v0.3.0 release](https://github.com/sauravsingla/VertiMosaic/releases/tag/v0.3.0) | Manifest, hashes, environment capture, preprint, and packaged evidence |
+| [Full v0.3.0 release](https://github.com/sauravsingla/VertiMosaic/releases/tag/v0.3.0) | Manifest, hashes, privacy audits, environment capture, preprint, and packaged evidence |
 
 Maintainer-generated release evidence demonstrates reproducibility of the maintained pipeline; it is **not the same as independent third-party reproduction**. Independent reproduction is supported under [`reproductions/`](reproductions/) and [`docs/independent_reproduction.md`](docs/independent_reproduction.md).
 
@@ -101,7 +111,7 @@ Maintainer-generated release evidence demonstrates reproducibility of the mainta
 | Try separate services with HTTPS/mTLS | [`deploy/compose/README.md`](deploy/compose/README.md) |
 | Explore the live project surface | [Hugging Face Space](https://huggingface.co/spaces/sauravsingla08/VertiMosaic) |
 
-## At a glance
+## Core scope
 
 | Property | Current scope |
 |---|---|
@@ -121,9 +131,7 @@ See [`docs/architecture.md`](docs/architecture.md) and [`docs/protocol.md`](docs
 
 ### `VFLLogisticRegression`
 
-A first-principles NumPy reference protocol. Each party computes logits and gradients using only its local feature matrix. Passive logits and residual-related signals pass through the explicit message/transport abstraction.
-
-The model records the parties present during training. At inference, omission of a trained party is an error by default; the research-only `zero_contribution` fallback must be selected explicitly.
+A first-principles NumPy reference protocol. Each party computes logits and gradients using only its local feature matrix. Passive logits and residual-related signals pass through the explicit message/transport abstraction. Omission of a trained party at inference is an error by default; the research-only `zero_contribution` fallback must be selected explicitly.
 
 ### `VFLHistGBDT`
 
@@ -173,14 +181,7 @@ Entity-level splits default to **70% train / 15% validation / 15% test**. Thresh
 
 Evaluation includes ROC-AUC, PR-AUC, precision, recall, F1, balanced accuracy, log loss, Brier score, calibration error, confusion counts, deterministic bootstrap intervals, and paired bootstrap differences.
 
-`vertimosaic-benchmark-matrix` compares:
-
-- centralized all-feature **non-federated** logistic regression;
-- Bank-only **non-federated** logistic regression;
-- `VFLLogisticRegression`; and
-- `VFLHistGBDT`.
-
-The formal matrix records utility, training/inference wall-clock time, sampled process RSS, protocol payload bytes/message counts, robustness fields, and a reproducible privacy-attack baseline. Protocol payload accounting is not a packet capture.
+`vertimosaic-benchmark-matrix` compares centralized all-feature and Bank-only **non-federated** baselines with `VFLLogisticRegression` and `VFLHistGBDT`. The formal matrix records utility, training/inference wall-clock time, sampled process RSS, protocol payload bytes/message counts, robustness fields, and a reproducible privacy-attack baseline.
 
 Every standard run bundle records configuration, dataset/linkage provenance, environment and dependency versions, predictions, metrics, training history, communication metadata, hashes, timestamps, seed, and Git state. `vertimosaic-reproduce` creates a clean reproduction evidence bundle with environment metadata and a stable result digest.
 
@@ -200,15 +201,9 @@ The default VFL protocols provide raw-feature locality, party-local preprocessin
 
 Sensitive derived signals—including gradients, Hessians, logits, residuals, entity membership, routing information, and split statistics—may leak information depending on the observer and protocol.
 
-Optional, explicitly scoped research mechanisms include:
+Optional, explicitly scoped research mechanisms include `ClippedGaussianDPBackend`, `PairwiseMaskSecureAggregation`, `AdditiveSecretSharingSum`, `OpenMinedPSIBackend`, and `PaillierHomomorphicSum`. None should be interpreted as a blanket **"secure VFL"** guarantee.
 
-- `ClippedGaussianDPBackend` for message-level clipping, Gaussian noise, zCDP composition, and `(epsilon, delta)` conversion;
-- `PairwiseMaskSecureAggregation` as an honest-but-curious secure-sum reference primitive;
-- `AdditiveSecretSharingSum` for additive-share sum experiments;
-- `OpenMinedPSIBackend` as an optional PSI adapter; and
-- `PaillierHomomorphicSum` for bounded additive homomorphic-sum experiments.
-
-None of these primitives should be interpreted as a blanket **"secure VFL"** guarantee. See [`docs/privacy_backends.md`](docs/privacy_backends.md), [`docs/privacy_experiments.md`](docs/privacy_experiments.md), [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md), and [`docs/threat_model.md`](docs/threat_model.md).
+See [`docs/privacy_backends.md`](docs/privacy_backends.md), [`docs/privacy_experiments.md`](docs/privacy_experiments.md), [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md), and [`docs/threat_model.md`](docs/threat_model.md).
 
 ## What is new in v0.3.0
 
