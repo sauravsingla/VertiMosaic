@@ -108,20 +108,16 @@ def prepare_exact_row_vertical_partitions(
         features.loc[split.validation, active_columns],
         features.loc[split.test, active_columns],
     )
-    passive_train, passive_validation, passive_test, passive_preprocess = (
-        _fit_transform_train_only(
-            features.loc[split.train, passive_columns],
-            features.loc[split.validation, passive_columns],
-            features.loc[split.test, passive_columns],
-        )
+    passive_train, passive_validation, passive_test, passive_preprocess = _fit_transform_train_only(
+        features.loc[split.train, passive_columns],
+        features.loc[split.validation, passive_columns],
+        features.loc[split.test, passive_columns],
     )
     y = target_numeric.to_numpy(dtype=float)
     return {
         "train_active": ActiveParty("credit_active", active_train, y[split.train]),
         "train_passive": [PassiveParty("credit_passive", passive_train)],
-        "validation_active": ActiveParty(
-            "credit_active", active_validation, y[split.validation]
-        ),
+        "validation_active": ActiveParty("credit_active", active_validation, y[split.validation]),
         "validation_passive": [PassiveParty("credit_passive", passive_validation)],
         "test_active": ActiveParty("credit_active", active_test, y[split.test]),
         "test_passive": [PassiveParty("credit_passive", passive_test)],
@@ -155,8 +151,10 @@ def run_uci_credit_linked_experiment(
         raise RuntimeError("UCI dataset 350 did not provide its binary target")
     target = targets.iloc[:, 0]
     original = getattr(data.data, "original", None)
-    source_frame = original.copy() if original is not None else pd.concat(
-        [features.reset_index(drop=True), targets.reset_index(drop=True)], axis=1
+    source_frame = (
+        original.copy()
+        if original is not None
+        else pd.concat([features.reset_index(drop=True), targets.reset_index(drop=True)], axis=1)
     )
     prepared = prepare_exact_row_vertical_partitions(features, target, seed=seed)
     train_active: ActiveParty = prepared["train_active"]
@@ -295,9 +293,7 @@ def main() -> None:
     parser.add_argument("--model", choices=["logistic", "vfl-hist-gbdt"], default="logistic")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--bootstrap-replicates", type=int, default=1000)
-    parser.add_argument(
-        "--output", type=Path, default=Path("reports/uci_credit_exact_linked.json")
-    )
+    parser.add_argument("--output", type=Path, default=Path("reports/uci_credit_exact_linked.json"))
     args = parser.parse_args()
     payload = run_uci_credit_linked_experiment(
         model_name=args.model,
