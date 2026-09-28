@@ -67,17 +67,35 @@ jobs:
           mkdir -p release-evidence
           python -m pip freeze --all | LC_ALL=C sort > release-evidence/pip-freeze.txt
           python -VV > release-evidence/python.txt
-      - name: Build hashed evidence manifest
+      - name: Build hashed evidence and canonical-result indexes
         run: python scripts/build_release_evidence.py
       - name: Package immutable release evidence
         run: |
           tar -czf vertimosaic-release-evidence.tar.gz \
             release-evidence \
             results reports benchmarks paper/figures paper/tables runs \
-            reproducibility/requirements-py312.lock 2>/dev/null || \
+            paper/preprint.md reproducibility/requirements-py312.lock 2>/dev/null || \
           tar -czf vertimosaic-release-evidence.tar.gz \
-            release-evidence benchmarks reports reproducibility/requirements-py312.lock
+            release-evidence benchmarks reports paper/preprint.md \
+            reproducibility/requirements-py312.lock
           sha256sum vertimosaic-release-evidence.tar.gz > vertimosaic-release-evidence.tar.gz.sha256
+      - name: Retain canonical measured evidence for manual runs and pull requests
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vertimosaic-release-evidence-${{ github.sha }}
+          path: |
+            vertimosaic-release-evidence.tar.gz
+            vertimosaic-release-evidence.tar.gz.sha256
+            release-evidence/manifest.json
+            release-evidence/canonical-results.json
+            benchmarks/
+            reports/
+            results/
+            paper/figures/
+            paper/tables/
+            paper/preprint.md
+          if-no-files-found: error
+          retention-days: 90
       - name: Publish GitHub Release assets for tag
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -90,6 +108,7 @@ jobs:
             vertimosaic-release-evidence.tar.gz \
             vertimosaic-release-evidence.tar.gz.sha256 \
             release-evidence/manifest.json \
+            release-evidence/canonical-results.json \
             release-evidence/pip-freeze.txt \
             benchmarks/formal_comparison.csv \
             benchmarks/formal_comparison.json \
@@ -98,4 +117,5 @@ jobs:
             reports/privacy_audit.json \
             reports/advanced_privacy_audit.json \
             reports/privacy_research.json \
-            reports/privacy_research_summary.csv
+            reports/privacy_research_summary.csv \
+            paper/preprint.md
