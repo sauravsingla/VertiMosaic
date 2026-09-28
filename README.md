@@ -21,9 +21,9 @@
 
 ## What VertiMosaic does
 
-Many organizations can describe the **same entities** while holding **different feature columns**. A bank may know payment behavior, a telecom provider service behavior, an insurer risk signals, and a retailer purchase behavior.
+Many organizations can describe the **same entities** while holding **different feature columns**. A bank may know payment behavior, a telecom provider may know service behavior, an insurer may know risk signals, and a retailer may know purchase behavior.
 
-VertiMosaic lets researchers and ML engineers **build, benchmark, and audit vertical federated learning workflows while each passive party keeps its raw feature table local**.
+VertiMosaic lets researchers and ML engineers **build, benchmark, and audit vertical federated learning workflows while parties keep their raw feature tables local**.
 
 ### 30-second mental model
 
@@ -38,7 +38,13 @@ Bank                    Telecom                 Insurance               Retail
                                 joint VFL model
 ```
 
-The reference protocols exchange model- and training-related signals instead of pooling passive-party raw feature matrices at the active party. **Raw-feature locality is not the same as end-to-end cryptographic privacy**, so privacy guarantees and non-guarantees are documented explicitly.
+<p align="center">
+  <img src="assets/vertimosaic-architecture.svg" alt="VertiMosaic architecture" width="92%">
+</p>
+
+The active party owns the target. Other parties retain their raw feature matrices and return protocol-specific local outputs. The reference protocols exchange model- and training-related signals instead of pooling passive-party raw feature matrices at the active party.
+
+> **Privacy boundary:** raw-feature locality is not the same as end-to-end cryptographic privacy. VertiMosaic documents the guarantees, assumptions, and non-guarantees of each research path explicitly.
 
 ## Try it in under a minute
 
@@ -62,29 +68,25 @@ vertimosaic demo --rows 2000 --seed 42
 
 ## Inspect measured evidence
 
-VertiMosaic avoids hand-written headline benchmark numbers. The **v0.3.0 release** publishes machine-generated evidence from the release source so results can be inspected independently.
+The **v0.3.0 release** publishes machine-generated evidence from the release source rather than manually entered headline numbers.
 
 | Evidence | What it contains |
 |---|---|
 | [`canonical-results.json`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/canonical-results.json) | Canonical release-result summary |
 | [`formal_comparison.md`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/formal_comparison.md) | Centralized, single-party, and VFL comparison output |
-| [`formal_comparison.csv`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/formal_comparison.csv) | Machine-readable comparison table |
 | [`remote_transport.json`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/remote_transport.json) | Serialized remote-transport measurements |
 | [`privacy_audit.json`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/privacy_audit.json) | Reproducible privacy-attack baseline |
-| [`advanced_privacy_audit.json`](https://github.com/sauravsingla/VertiMosaic/releases/download/v0.3.0/advanced_privacy_audit.json) | Advanced privacy-audit output |
 | [Full v0.3.0 release](https://github.com/sauravsingla/VertiMosaic/releases/tag/v0.3.0) | Manifest, hashes, environment capture, preprint, and packaged evidence |
 
-Maintainer-generated release evidence demonstrates reproducibility of the maintained pipeline; it is **not the same as independent third-party reproduction**. Independent reproduction is supported separately under [`reproductions/`](reproductions/) and [`docs/independent_reproduction.md`](docs/independent_reproduction.md).
+Maintainer-generated release evidence demonstrates reproducibility of the maintained pipeline; it is **not the same as independent third-party reproduction**. Independent reproduction is supported under [`reproductions/`](reproductions/) and [`docs/independent_reproduction.md`](docs/independent_reproduction.md).
 
 ## Why VertiMosaic?
 
-- **CPU-first** — runs without dedicated accelerators and fits laptops, CI, and GitHub-hosted research workflows.
-- **Built for tabular VFL** — includes reference logistic and histogram-GBDT protocols rather than only a generic distributed-training wrapper.
-- **Strict entity alignment** — research paths can reject equal-length but differently ordered party rows instead of silently treating them as aligned.
-- **Auditable communication** — protocol messages, payload accounting, and a separate serialized HTTP benchmark path are measurable.
+- **CPU-first tabular VFL** — reference logistic and histogram-GBDT protocols run without dedicated accelerators.
+- **Protocol correctness** — strict entity alignment can reject equal-length but differently ordered party rows.
+- **Auditable experiments** — communication, runtime, memory, metrics, provenance, and reproducibility metadata are recorded explicitly.
 - **Linked public benchmarks** — includes exact-NPI multi-source provider linkage and exact multi-table MovieLens linkage.
-- **Explicit privacy boundaries** — distinguishes raw-feature locality from stronger DP, PSI, MPC, HE, secure-aggregation, or malicious-party guarantees.
-- **Reproducibility first** — deterministic runs, release evidence, environment capture, hashes, benchmark outputs, and independent-reproduction schemas.
+- **Explicit privacy boundaries** — raw-feature locality is kept separate from stronger DP, PSI, MPC, HE, secure-aggregation, or malicious-party guarantees.
 
 ## Pick your path
 
@@ -104,27 +106,18 @@ Maintainer-generated release evidence demonstrates reproducibility of the mainta
 | Property | Current scope |
 |---|---|
 | Federation | Vertical federated learning |
-| Reference models | `VFLLogisticRegression`, `VFLHistGBDT` |
+| Models | `VFLLogisticRegression`, `VFLHistGBDT` |
 | Compute | CPU supported; GPU not required |
 | Raw passive feature tables pooled during VFL | No |
 | Entity alignment | Order-sensitive validation in strict research paths |
 | Public linked benchmarks | NPI multi-source, MovieLens multi-table, UCI exact-row; optional local IEEE-CIS |
-| Privacy research | PSI, clipped Gaussian/zCDP, secure-sum, additive sharing, Paillier adapters |
 | Reproducibility | Run bundles, release evidence, hashes, environment capture, reproduction schemas |
 
-## Architecture
-
-<p align="center">
-  <img src="assets/vertimosaic-architecture.svg" alt="VertiMosaic architecture" width="100%">
-</p>
-
-The active party owns the target. Passive parties retain their raw feature matrices and return protocol-specific local outputs. `VFLLogisticRegression` exchanges local logits/residual-related signals for party-local gradient updates. `VFLHistGBDT` exchanges target-derived gradient/Hessian signals and aggregate histogram candidate statistics while numeric split thresholds and routing state remain with the owning party.
+## Architecture and reference protocols
 
 `InMemoryTransport` provides deterministic protocol simulation and message auditing. `RemoteHTTPTransport` provides a separate serialized HTTP path with bounded requests/responses, authorization, replay controls, idempotency limits, rate limiting, optional compressed NumPy transport, and signed-message support. The Docker Compose example adds separate services, party-local volumes, HTTPS/mTLS, bearer authorization, health checks, and deterministic sample data.
 
-See [`docs/architecture.md`](docs/architecture.md) and [`docs/protocol.md`](docs/protocol.md).
-
-## Reference protocols
+See [`docs/architecture.md`](docs/architecture.md) and [`docs/protocol.md`](docs/protocol.md) for the full design.
 
 ### `VFLLogisticRegression`
 
@@ -219,14 +212,12 @@ None of these primitives should be interpreted as a blanket **"secure VFL"** gua
 
 ## What is new in v0.3.0
 
-- order-sensitive entity alignment;
-- explicit missing-party behavior in `VFLLogisticRegression`;
+- order-sensitive entity alignment and explicit missing-party behavior;
 - protected logistic research path with PSI-based alignment and scoped clipped-Gaussian residual releases;
 - exact-NPI multi-source public benchmark builder;
 - external-comparator exchange contract for measured FATE/SecretFlow comparisons;
-- independent-reproduction evidence schemas and validation tooling;
-- four focused tutorials and a separate-service Docker Compose HTTPS/mTLS example; and
-- immutable release-evidence assets with results, privacy audits, environment metadata, hashes, and reproduction artifacts.
+- independent-reproduction evidence schemas and validation tooling; and
+- immutable release-evidence assets, focused tutorials, and a separate-service HTTPS/mTLS deployment example.
 
 Latest release: **[VertiMosaic v0.3.0](https://github.com/sauravsingla/VertiMosaic/releases/tag/v0.3.0)**.
 
@@ -291,10 +282,8 @@ Key documentation:
 - [`docs/linked_benchmarks.md`](docs/linked_benchmarks.md) — linked-benchmark taxonomy
 - [`docs/npi_linked_benchmark.md`](docs/npi_linked_benchmark.md) — exact-NPI benchmark
 - [`docs/external_comparators.md`](docs/external_comparators.md) — comparator exchange and measurement contract
-- [`docs/protected_logistic.md`](docs/protected_logistic.md) — protected logistic research path
 - [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md) — privacy claim boundaries
 - [`docs/threat_model.md`](docs/threat_model.md) — adversary and non-goals
-- [`docs/reproducibility.md`](docs/reproducibility.md) — experiment reproducibility
 - [`docs/independent_reproduction.md`](docs/independent_reproduction.md) — external reproduction procedure
 - [`docs/release_evidence.md`](docs/release_evidence.md) — immutable release evidence
 - [`docs/limitations.md`](docs/limitations.md) — known limitations and non-claims
