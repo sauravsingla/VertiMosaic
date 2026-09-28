@@ -6,7 +6,6 @@ import hashlib
 import json
 import pathlib
 
-
 REQUIRED_FILES = (
     "attestation.json",
     "environment.json",
