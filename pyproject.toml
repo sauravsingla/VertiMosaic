@@ -45,6 +45,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/sauravsingla/VertiMosaic"
+Documentation = "https://sauravsingla.github.io/VertiMosaic/"
 Repository = "https://github.com/sauravsingla/VertiMosaic"
 Issues = "https://github.com/sauravsingla/VertiMosaic/issues"
 Dataset = "https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark"
