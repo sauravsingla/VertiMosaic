@@ -23,7 +23,8 @@ def _relay_process(port_queue: Any) -> None:
         sender_signing_keys={"active": {"benchmark-v1": _SECRET}},
         require_signed_messages=True,
     )
-    host, port = server.server_address
+    host = str(server.server_address[0])
+    port = int(server.server_address[1])
     port_queue.put((host, port))
     server.serve_forever(poll_interval=0.05)
 

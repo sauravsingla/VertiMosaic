@@ -242,37 +242,52 @@ def run_formal_benchmark(
     validation_active, validation_passive = slice_parties(active, passive, split.validation)
     test_active, test_passive = slice_parties(active, passive, split.test)
 
-    common = dict(
-        train_active=train_active,
-        train_passive=train_passive,
-        validation_active=validation_active,
-        validation_passive=validation_passive,
-        test_active=test_active,
-        test_passive=test_passive,
-        seed=seed,
-    )
     records = [
         _non_federated_row(
             protocol="centralized_all_features",
+            train_active=train_active,
+            train_passive=train_passive,
+            validation_active=validation_active,
+            validation_passive=validation_passive,
+            test_active=test_active,
+            test_passive=test_passive,
+            seed=seed,
             all_features=True,
-            **common,
         ),
         _non_federated_row(
             protocol="single_party_bank",
+            train_active=train_active,
+            train_passive=train_passive,
+            validation_active=validation_active,
+            validation_passive=validation_passive,
+            test_active=test_active,
+            test_passive=test_passive,
+            seed=seed,
             all_features=False,
-            **common,
         ),
         _vfl_row(
             model_name="logistic",
+            train_active=train_active,
+            train_passive=train_passive,
+            validation_active=validation_active,
+            validation_passive=validation_passive,
+            test_active=test_active,
+            test_passive=test_passive,
+            seed=seed,
             logistic_max_iter=logistic_max_iter,
             gbdt_estimators=gbdt_estimators,
-            **common,
         ),
         _vfl_row(
             model_name="vfl-hist-gbdt",
+            train_active=train_active,
+            train_passive=train_passive,
+            validation_active=validation_active,
+            validation_passive=validation_passive,
+            test_active=test_active,
+            test_passive=test_passive,
+            seed=seed,
             logistic_max_iter=logistic_max_iter,
             gbdt_estimators=gbdt_estimators,
-            **common,
         ),
     ]
     frame = pd.DataFrame(records)
