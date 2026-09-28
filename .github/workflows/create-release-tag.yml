@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Create validated release tag
+
+on:
+  push:
+    branches:
+      - "release/v*"
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Validate version branch and main commit
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          print(tomllib.loads(Path('pyproject.toml').read_text())['project']['version'])
+          PY
+          )
+          EXPECTED_BRANCH="release/v${VERSION}"
+          if [[ "${GITHUB_REF_NAME}" != "${EXPECTED_BRANCH}" ]]; then
+            echo "Release branch ${GITHUB_REF_NAME} does not match ${EXPECTED_BRANCH}" >&2
+            exit 1
+          fi
+          if [[ "${VERSION}" == *dev* || "${VERSION}" == *rc* ]]; then
+            echo "Release branch may only tag a final version" >&2
+            exit 1
+          fi
+          git fetch origin main --depth=1
+          MAIN_SHA=$(git rev-parse origin/main)
+          if [[ "${GITHUB_SHA}" != "${MAIN_SHA}" ]]; then
+            echo "Release branch must point exactly at current main" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+      - name: Create immutable release tag reference
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/tmp/tag.txt 2>/dev/null; then
+            REMOTE_SHA=$(awk '{print $1}' /tmp/tag.txt)
+            if [[ "${REMOTE_SHA}" != "${GITHUB_SHA}" ]]; then
+              echo "Existing ${TAG} points at ${REMOTE_SHA}, not ${GITHUB_SHA}" >&2
+              exit 1
+            fi
+            echo "${TAG} already points at the validated release commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" "${GITHUB_SHA}" -m "VertiMosaic ${TAG}"
+          git push origin "refs/tags/${TAG}"
