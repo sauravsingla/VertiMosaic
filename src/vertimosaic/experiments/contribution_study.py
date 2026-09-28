@@ -152,9 +152,7 @@ def run_contribution_study(
         # The permutation ablation deliberately replaces feature representations inside
         # fixed entity slots. The entity IDs therefore remain in the original slot order
         # so protocol alignment is still explicit while feature-to-entity signal is broken.
-        active_features = (
-            test_active._x[permutation] if party == "bank" else test_active._x.copy()
-        )
+        active_features = test_active._x[permutation] if party == "bank" else test_active._x.copy()
         permuted_active = ActiveParty("bank", active_features, test_active.labels)
         _bind_partition_ids(permuted_active, test_active)
 
