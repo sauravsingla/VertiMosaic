@@ -20,7 +20,8 @@ def test_gaussian_zcdp_accounting_composes_releases() -> None:
 
 
 def test_gaussian_backend_is_seed_reproducible_and_reports_scope() -> None:
-    values = np.array([1.0, -2.0, 3.0])n    first = GaussianDPBackend(l2_sensitivity=1.5, noise_multiplier=2.0, seed=7)
+    values = np.array([1.0, -2.0, 3.0])
+    first = GaussianDPBackend(l2_sensitivity=1.5, noise_multiplier=2.0, seed=7)
     second = GaussianDPBackend(l2_sensitivity=1.5, noise_multiplier=2.0, seed=7)
     released_first = first.release(values)
     released_second = second.release(values)
