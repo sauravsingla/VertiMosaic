@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  A reproducible research framework for organizations that hold complementary feature columns about the same or overlapping entities while keeping raw party feature tables local.
+  A reproducible VFL research framework with strict entity alignment, exact-linked public benchmarks, auditable communication, explicit privacy boundaries, and release-grade experimental evidence.
 </p>
 
 <p align="center">
@@ -19,9 +19,24 @@
   <a href="https://huggingface.co/spaces/sauravsingla08/VertiMosaic"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Live%20Space-FFD21E" alt="Hugging Face Space"></a>
 </p>
 
-VertiMosaic is an open-source **vertical federated learning (VFL)** research framework for tabular data. Different parties retain different feature columns for aligned entities, and the reference VFL protocols request party-local computations instead of pooling passive-party raw feature matrices at the active party.
+VertiMosaic is an open-source **vertical federated learning (VFL)** research framework for tabular data. Different parties retain different feature columns for aligned entities, and the reference protocols request party-local computation instead of pooling passive-party raw feature matrices at the active party.
 
-The project focuses on **reproducibility, provenance, communication measurement, explicit privacy boundaries, and CPU-friendly reference implementations**. Raw-feature locality is a design property; it is not presented as equivalent to end-to-end cryptographic privacy.
+The project focuses on **protocol correctness, reproducibility, provenance, communication measurement, explicit privacy boundaries, and CPU-friendly reference implementations**. Raw-feature locality is a design property; it is not presented as equivalent to end-to-end cryptographic privacy.
+
+## What is new in v0.3.0
+
+VertiMosaic v0.3.0 strengthens the research and protocol surface in several important ways:
+
+- **order-sensitive entity alignment** so equal-length but differently ordered party rows can be rejected instead of silently treated as aligned;
+- **explicit missing-party behavior** in `VFLLogisticRegression`, with errors by default and zero-contribution fallback only when deliberately enabled for research;
+- a **protected logistic research path** combining PSI-based entity intersection/canonical ordering with clipped-Gaussian residual releases and scoped zCDP accounting;
+- a **real exact-NPI multi-source public benchmark builder** linking provider entities across Open Payments, NPPES, and CMS Care Compare/provider data;
+- a framework-neutral **external-comparator exchange contract** for FATE, SecretFlow, or another VFL framework, without inventing unmeasured third-party results;
+- **independent-reproduction evidence schemas and validation tooling**;
+- four focused tutorials and a separate-service **Docker Compose HTTPS/mTLS deployment example**;
+- immutable release-evidence assets containing canonical results, benchmark outputs, privacy audits, environment metadata, hashes, and reproduction artifacts.
+
+Latest release: **[VertiMosaic v0.3.0](https://github.com/sauravsingla/VertiMosaic/releases/tag/v0.3.0)**.
 
 ## At a glance
 
@@ -29,15 +44,20 @@ The project focuses on **reproducibility, provenance, communication measurement,
 |---|---|
 | Federation | Vertical federated learning |
 | Reference models | `VFLLogisticRegression`, `VFLHistGBDT` |
-| Active party in the cross-industry benchmark | Bank, with target |
+| Protocol alignment | Order-sensitive entity IDs/digests with exact-match validation in strict research paths |
+| Missing-party default | Error; zero-contribution fallback is explicit opt-in research behavior |
+| Active party in the four-industry benchmark | Bank, with target |
 | Passive parties | Telecom, Insurance, Retail |
 | Raw passive feature tables pooled during VFL | No |
 | Compute | CPU supported; GPU not required |
+| Real exact multi-source public linkage | NPI-linked Open Payments + NPPES + CMS Care Compare/provider data |
 | Public exact-linked benchmark | MovieLens 1M multi-table linkage |
 | Additional linked benchmarks | UCI exact-row vertical partition; authorized local IEEE-CIS transaction/identity linkage |
 | Cross-industry benchmark | Public-source, explicitly semi-synthetic linkage |
-| Default privacy posture | Research protocol with raw-feature locality; not end-to-end cryptographic VFL |
-| Optional privacy research mechanisms | Clipped Gaussian/zCDP releases, secure-sum and additive-sharing primitives, PSI and Paillier adapters |
+| Protected logistic research path | PSI alignment + clipped-Gaussian residual releases with scoped accounting |
+| Default privacy posture | Raw-feature locality; not end-to-end cryptographic VFL |
+| Optional privacy research mechanisms | Clipped Gaussian/zCDP releases, secure-sum, additive sharing, PSI, Paillier |
+| External framework comparison | Deterministic exchange/normalization contract available; measured third-party runs remain external work |
 
 ## Architecture
 
@@ -47,7 +67,7 @@ The project focuses on **reproducibility, provenance, communication measurement,
 
 The active party owns the target. Passive parties retain their raw feature matrices and return only protocol-specific local outputs. `VFLLogisticRegression` exchanges local logits/residual-related signals for party-local gradient updates. `VFLHistGBDT` exchanges target-derived gradient/Hessian signals and aggregate histogram candidate statistics while numeric split thresholds and routing state remain with the owning party.
 
-`InMemoryTransport` provides deterministic protocol simulation and message auditing. `RemoteHTTPTransport` provides a separate serialized HTTP path with bounded requests/responses, authorization, replay controls, idempotency limits, rate limiting, optional compressed NumPy transport, and signed-message support. These transport controls do not turn the default learning protocol into malicious-secure VFL.
+`InMemoryTransport` provides deterministic protocol simulation and message auditing. `RemoteHTTPTransport` provides a separate serialized HTTP path with bounded requests/responses, authorization, replay controls, idempotency limits, rate limiting, optional compressed NumPy transport, and signed-message support. The Docker Compose deployment example adds separate services, party-local volumes, HTTPS/mTLS, bearer authorization, health checks, and deterministic sample data. These transport controls do not turn the default learning protocol into malicious-secure VFL.
 
 ## Installation
 
@@ -89,6 +109,17 @@ vertimosaic demo --rows 2000 --seed 42
 
 The demo is a smoke experiment and uses **100 bootstrap replicates**. Normal research experiment and benchmark paths use **1,000 bootstrap replicates** where practical. Standard experiment outputs are written as reproducibility bundles under `runs/<run_id>/`.
 
+### Tutorials
+
+Start with the focused walkthroughs:
+
+- [`tutorials/01_first_vfl_10_minutes.md`](tutorials/01_first_vfl_10_minutes.md) — first VFL run in about 10 minutes
+- [`tutorials/02_two_party_logistic.md`](tutorials/02_two_party_logistic.md) — strict two-party logistic VFL
+- [`tutorials/03_histogram_gbdt.md`](tutorials/03_histogram_gbdt.md) — vertical histogram GBDT
+- [`tutorials/04_privacy_leakage_and_mitigation.md`](tutorials/04_privacy_leakage_and_mitigation.md) — leakage, audits, and scoped mitigations
+
+For separate-service execution with HTTPS/mTLS, see [`deploy/compose/README.md`](deploy/compose/README.md).
+
 ### Useful research commands
 
 | Goal | Command |
@@ -100,6 +131,22 @@ The demo is a smoke experiment and uses **100 bootstrap replicates**. Normal res
 | Advanced privacy research audit | `vertimosaic-advanced-privacy-audit` |
 | Clean reproduction evidence bundle | `vertimosaic-reproduce` |
 | Cross-industry / synthetic CLI workflows | `vertimosaic --help` |
+
+## Protocol correctness
+
+### Entity alignment
+
+Strict research paths bind ordered pseudonymous entity identifiers to party partitions and derive order-sensitive digests. Training, validation, and inference can therefore reject party collections whose entity sets or ordering do not match exactly.
+
+This is intentionally stronger than checking only row counts: two parties can have the same number of rows while referring to different entities or different row orders.
+
+See [`docs/protocol.md`](docs/protocol.md) and the alignment implementation under [`src/vertimosaic/alignment/`](src/vertimosaic/alignment/).
+
+### Missing parties
+
+`VFLLogisticRegression` records the parties present during training. At inference, omission of a trained party is an error by default. The research-only `zero_contribution` fallback must be selected explicitly; it is not a silent default.
+
+This keeps dropout experiments possible without allowing accidental party omission to pass unnoticed in ordinary inference.
 
 ## Reference protocols
 
@@ -113,17 +160,40 @@ A vertical histogram-gradient-boosting reference implementation. Each party fits
 
 Centralized models are provided only as **non-federated baselines**. They deliberately pool selected feature columns and must not be described as VFL.
 
+## Protected logistic research path
+
+VertiMosaic v0.3.0 includes an explicitly scoped protected logistic workflow in [`src/vertimosaic/privacy/protected_logistic.py`](src/vertimosaic/privacy/protected_logistic.py).
+
+The path can:
+
+1. intersect party entity sets through a configured PSI backend;
+2. canonicalize all parties to one exact ordered entity sequence;
+3. bind strict entity metadata to the aligned partitions; and
+4. train `VFLLogisticRegression` with `ClippedGaussianDPBackend` applied to active-to-passive residual releases.
+
+The resulting privacy report is deliberately narrow. PSI protects set intersection according to the selected PSI backend's threat model, while clipped-Gaussian accounting covers the protected residual-release family only. **Logits, model parameters, timing, other protocol messages, routing information, and transport metadata remain outside that composite guarantee.**
+
+See [`docs/protected_logistic.md`](docs/protected_logistic.md), [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md), and [`docs/threat_model.md`](docs/threat_model.md).
+
 ## Benchmarks and linkage categories
 
 VertiMosaic keeps linkage categories explicit so reproducibility is not confused with stronger real-world linkage evidence.
 
-### 1. MovieLens 1M — public exact multi-table linkage
+### 1. NPI-linked public provider benchmark — real exact multi-source linkage
+
+The v0.3 benchmark builder in [`src/vertimosaic/datasets/npi_public.py`](src/vertimosaic/datasets/npi_public.py) links real provider entities using the authoritative 10-digit **National Provider Identifier (NPI)** across distinct public US government data products.
+
+The active side can use prior-period Open Payments aggregates, the target can be derived from a later Open Payments period, and passive features can come from NPPES and CMS Care Compare/provider data for the exact same ordered provider entities.
+
+This is genuine exact **multi-source public linkage** over real providers. It must **not** be described as evidence of private cross-company collaboration, private data sharing, or production PSI. See [`docs/npi_linked_benchmark.md`](docs/npi_linked_benchmark.md).
+
+### 2. MovieLens 1M — public exact multi-table linkage
 
 `vertimosaic-linked-movielens` downloads MovieLens 1M directly from GroupLens and links its observed `users.dat`, `ratings.dat`, and `movies.dat` identifiers. The active side uses user demographics; the passive side derives historical rating/genre behavior from the earlier portion of each user's timeline; the target is derived from later rating events that are excluded from passive features.
 
 This is **genuine exact linkage across public tables describing the same service users**. It is still a single-service dataset, not cross-organization entity resolution and not evidence of PSI.
 
-### 2. IEEE-CIS — authorized local exact linkage
+### 3. IEEE-CIS — authorized local exact linkage
 
 The optional IEEE-CIS path joins locally authorized transaction and identity files on exact `TransactionID` intersection. VertiMosaic does not download or redistribute those competition files.
 
@@ -139,11 +209,11 @@ vertimosaic run-ieee-cis \
   --seed 42
 ```
 
-### 3. UCI Credit — exact-row vertical partition
+### 4. UCI Credit — exact-row vertical partition
 
 `vertimosaic-linked-uci` retrieves UCI Default of Credit Card Clients at runtime and partitions disjoint source columns between active and passive parties while preserving exact entity rows. It is a useful public linkage sanity benchmark, but the two partitions originate from one source dataset and therefore do not demonstrate cross-organization entity resolution.
 
-### 4. Four-industry benchmark — semi-synthetic cross-domain linkage
+### 5. Four-industry benchmark — semi-synthetic cross-domain linkage
 
 The Bank/Telecom/Insurance/Retail benchmark uses real public source-domain data but the four sources do **not** describe the same real individuals. They are independently preprocessed and connected by an explicitly documented research linkage mechanism.
 
@@ -156,11 +226,11 @@ The Bank/Telecom/Insurance/Retail benchmark uses real public source-domain data 
 
 `observed_target_external` uses the Bank target with target-blind external linkage. `distributed_signal_external` links transformed source-domain features first and generates the disclosed semi-synthetic target only after the linked profiles are formed.
 
-### 5. Controlled synthetic and overlap studies
+### 6. Controlled synthetic and overlap studies
 
 `synthetic_scale` supports controlled scaling, overlap, dropout, drift, noise, and distributed-signal experiments. `vertimosaic overlap` evaluates **100%, 90%, 75%, 50%, and 25%** Bank-to-passive overlap while preserving deterministic entity splits and reporting coverage, utility, and communication separately for each strategy.
 
-For full linkage definitions and limitations, see [`docs/linked_benchmarks.md`](docs/linked_benchmarks.md) and [`docs/linkage.md`](docs/linkage.md).
+For full linkage definitions and limitations, see [`docs/linked_benchmarks.md`](docs/linked_benchmarks.md), [`docs/npi_linked_benchmark.md`](docs/npi_linked_benchmark.md), and [`docs/linkage.md`](docs/linkage.md).
 
 ## Evaluation, communication, and reproducibility
 
@@ -181,13 +251,41 @@ The formal matrix records utility, training/inference wall-clock time, sampled p
 
 Every standard run bundle records configuration, dataset/linkage provenance, environment and dependency versions, predictions, metrics, training history, communication metadata, hashes, timestamps, seed, and Git state. `vertimosaic-reproduce` creates an additional clean reproduction evidence bundle with environment metadata and a stable result digest.
 
+## External VFL comparators
+
+VertiMosaic provides a deterministic export/import contract for comparison with established VFL frameworks such as **FATE** or **SecretFlow**:
+
+- [`scripts/export_comparator_benchmark.py`](scripts/export_comparator_benchmark.py) freezes aligned party arrays, targets, entity IDs, splits, and SHA-256 metadata;
+- [`scripts/run_external_comparator.py`](scripts/run_external_comparator.py) normalizes measured external-framework output into the repository's comparison schema;
+- [`docs/external_comparators.md`](docs/external_comparators.md) documents the contract and claim boundaries.
+
+The repository does **not** treat a wrapper or exchange format as if it were a measured FATE/SecretFlow result. Third-party comparator rows remain pending until those frameworks are actually run and measured against the frozen exchange bundle.
+
+## Release evidence
+
+The **v0.3.0 GitHub release** includes machine-generated evidence assets rather than manually entered headline numbers. The release-evidence workflow reproduces the immutable release source and publishes, among other files:
+
+- `canonical-results.json`;
+- `manifest.json` with hashed evidence references;
+- formal comparison CSV/JSON/Markdown outputs;
+- serialized remote-transport measurements;
+- empirical and advanced privacy-audit results;
+- multi-seed privacy-research results;
+- exact `pip-freeze.txt` environment capture;
+- the technical preprint; and
+- a packaged `vertimosaic-release-evidence.tar.gz` plus SHA-256 checksum.
+
+See the **[v0.3.0 release assets](https://github.com/sauravsingla/VertiMosaic/releases/tag/v0.3.0)** and [`docs/release_evidence.md`](docs/release_evidence.md).
+
+Maintainer CI and release evidence demonstrate reproducibility of the maintained pipeline, but they are **not the same as independent third-party reproduction**. The repository provides a separate attestation schema and validation path under [`reproductions/`](reproductions/) and [`docs/independent_reproduction.md`](docs/independent_reproduction.md).
+
 ## Privacy and security boundary
 
 The default VFL protocols provide raw-feature locality, party-local preprocessing/computation, explicit message boundaries, and auditable research transports. They do **not** automatically provide end-to-end differential privacy, PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, or malicious-party security.
 
 Sensitive derived signals—including gradients, Hessians, logits, residuals, entity membership, routing information, and split statistics—may leak information depending on the observer and protocol.
 
-VertiMosaic v0.2.0 also includes **optional, explicitly scoped research mechanisms**:
+VertiMosaic v0.3.0 includes **optional, explicitly scoped research mechanisms**:
 
 - `ClippedGaussianDPBackend` for message-level L2 clipping, Gaussian noise, zCDP composition, and `(epsilon, delta)` conversion;
 - `PairwiseMaskSecureAggregation` as an honest-but-curious secure-sum reference primitive;
@@ -195,7 +293,7 @@ VertiMosaic v0.2.0 also includes **optional, explicitly scoped research mechanis
 - `OpenMinedPSIBackend` as an optional PSI adapter; and
 - `PaillierHomomorphicSum` for bounded additive homomorphic-sum experiments.
 
-None of these primitives is silently enabled in the default VFL algorithms, and their presence must not be interpreted as a blanket "secure VFL" guarantee. See [`docs/threat_model.md`](docs/threat_model.md), [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md), [`docs/privacy_backends.md`](docs/privacy_backends.md), and [`docs/privacy_experiments.md`](docs/privacy_experiments.md).
+The protected logistic path composes some of these mechanisms for one explicit research workflow, but none of the primitives should be interpreted as a blanket **"secure VFL"** guarantee. See [`docs/privacy_backends.md`](docs/privacy_backends.md), [`docs/privacy_experiments.md`](docs/privacy_experiments.md), [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md), and [`docs/threat_model.md`](docs/threat_model.md).
 
 ## Verification and portability
 
@@ -212,25 +310,30 @@ python -m build
 twine check dist/*
 ```
 
-CI exercises Python 3.11/3.12, protocol-critical coverage, paper/reproduction smoke paths, privacy audits, remote transport measurement, package validation, CodeQL, dependency audit/SBOM generation, optional crypto backends, and portability smoke checks on Linux ARM64, macOS, and Windows. Protocol-critical modules target at least **90% coverage**.
+CI exercises Python 3.11/3.12, protocol-critical coverage, paper/reproduction smoke paths, privacy audits, remote transport measurement, package validation, CodeQL, dependency audit/SBOM generation, optional crypto backends, clean-room reproduction, external-data integration, and portability smoke checks on Linux ARM64, macOS, and Windows. Protocol-critical modules target at least **90% coverage**.
 
-## Documentation
+## Research report and documentation
+
+The working technical report is [`paper/preprint.md`](paper/preprint.md), with the full experiment plan in [`paper/experiment_manifest.md`](paper/experiment_manifest.md).
+
+Key documentation:
 
 - [`docs/architecture.md`](docs/architecture.md) — architecture and component boundaries
-- [`docs/protocol.md`](docs/protocol.md) — reference protocol details
+- [`docs/protocol.md`](docs/protocol.md) — reference protocol details and alignment behavior
 - [`docs/formal_benchmark.md`](docs/formal_benchmark.md) — benchmark matrix and interpretation boundaries
 - [`docs/linked_benchmarks.md`](docs/linked_benchmarks.md) — exact-linked and semi-synthetic benchmark taxonomy
-- [`docs/datasets.md`](docs/datasets.md) — source datasets
-- [`docs/linkage.md`](docs/linkage.md) — linkage design
+- [`docs/npi_linked_benchmark.md`](docs/npi_linked_benchmark.md) — exact-NPI multi-source public benchmark
+- [`docs/external_comparators.md`](docs/external_comparators.md) — FATE/SecretFlow exchange and measurement contract
+- [`docs/protected_logistic.md`](docs/protected_logistic.md) — PSI + clipped-Gaussian protected logistic research path
 - [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md) — privacy claim boundaries
 - [`docs/privacy_backends.md`](docs/privacy_backends.md) — optional privacy/crypto research mechanisms
 - [`docs/privacy_experiments.md`](docs/privacy_experiments.md) — empirical privacy research
 - [`docs/threat_model.md`](docs/threat_model.md) — adversary and non-goals
 - [`docs/reproducibility.md`](docs/reproducibility.md) — experiment reproducibility
 - [`docs/independent_reproduction.md`](docs/independent_reproduction.md) — external reproduction procedure
-- [`docs/limitations.md`](docs/limitations.md) — known limitations
+- [`docs/release_evidence.md`](docs/release_evidence.md) — immutable release evidence
+- [`docs/limitations.md`](docs/limitations.md) — known limitations and non-claims
 - [`docs/release_policy.md`](docs/release_policy.md) — release policy
-- [`paper/experiment_manifest.md`](paper/experiment_manifest.md) — paper experiment manifest
 
 ## Citation
 
@@ -239,7 +342,7 @@ If you use VertiMosaic in research or development, cite the software using [`CIT
 ```text
 VertiMosaic
 Saurav Singla
-Version 0.2.0
+Version 0.3.0
 Apache-2.0
 https://github.com/sauravsingla/VertiMosaic
 ```
