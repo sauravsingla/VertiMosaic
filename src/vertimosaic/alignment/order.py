@@ -10,6 +10,8 @@ import numpy as np
 @runtime_checkable
 class _PartyLike(Protocol):
     name: str
+    _entity_ids: np.ndarray | None
+    _entity_digest: str | None
 
     @property
     def n_rows(self) -> int: ...
@@ -42,9 +44,9 @@ def ordered_entity_digest(entity_ids: Sequence[object] | np.ndarray) -> str:
 def bind_entity_ids(party: _PartyLike, entity_ids: Sequence[object] | np.ndarray) -> None:
     """Attach immutable ordered entity identifiers and their digest to a party object.
 
-    ``PassiveParty`` deliberately keeps raw features private.  Entity identifiers are
+    ``PassiveParty`` deliberately keeps raw features private. Entity identifiers are
     therefore attached as protocol metadata rather than mixed into the feature matrix.
-    The IDs may already be pseudonymous.  Only the order-sensitive digest is required by
+    The IDs may already be pseudonymous. Only the order-sensitive digest is required by
     the model boundary; callers can drop the raw identifier array after binding if their
     deployment policy requires it.
     """
@@ -54,8 +56,8 @@ def bind_entity_ids(party: _PartyLike, entity_ids: Sequence[object] | np.ndarray
             f"entity_ids length for party {party.name!r} ({len(values)}) does not match "
             f"its row count ({party.n_rows})"
         )
-    setattr(party, "_entity_ids", values)
-    setattr(party, "_entity_digest", ordered_entity_digest(values))
+    party._entity_ids = values
+    party._entity_digest = ordered_entity_digest(values)
 
 
 def entity_ids_for(party: _PartyLike) -> np.ndarray | None:
@@ -79,8 +81,8 @@ def validate_exact_entity_alignment(
     """Validate that parties refer to exactly the same entities in exactly the same order.
 
     When ``require_bound_ids`` is false, a collection in which *no* party has identifiers
-    remains accepted for backwards compatibility.  A mixed collection (some bound, some
-    unbound) is always rejected.  Production/research entry points should bind identifiers
+    remains accepted for backwards compatibility. A mixed collection (some bound, some
+    unbound) is always rejected. Production/research entry points should bind identifiers
     and use ``require_bound_ids=True``.
     """
     if not parties:
@@ -101,7 +103,8 @@ def validate_exact_entity_alignment(
         )
         raise ValueError(f"{context}: missing entity identifiers for parties: {missing}")
     first = digests[0]
-    assert first is not None
+    if first is None:
+        raise RuntimeError(f"{context}: inconsistent entity-alignment state")
     for party, digest in zip(parties[1:], digests[1:], strict=True):
         if digest != first:
             raise ValueError(
