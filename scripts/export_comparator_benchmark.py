@@ -26,8 +26,7 @@ def _sha256(path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Export a frozen VertiMosaic benchmark exchange bundle for external VFL "
-            "frameworks"
+            "Export a frozen VertiMosaic benchmark exchange bundle for external VFL frameworks"
         )
     )
     parser.add_argument("--rows", type=int, default=2000)
