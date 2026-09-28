@@ -60,9 +60,7 @@ def _markdown_table(frame: pd.DataFrame) -> str:
     return "\n".join([header, rule, *body]) + "\n"
 
 
-def _membership(
-    train_probability: np.ndarray, test_probability: np.ndarray
-) -> tuple[float, float]:
+def _membership(train_probability: np.ndarray, test_probability: np.ndarray) -> tuple[float, float]:
     result = confidence_membership_inference(train_probability, test_probability)
     return float(result.roc_auc), float(result.attack_advantage)
 
@@ -347,8 +345,7 @@ def run_formal_benchmark(
         "# VertiMosaic formal benchmark matrix\n\n"
         "Centralized rows are explicitly non-federated research baselines. "
         "Communication values are protocol payload accounting. Membership leakage is a "
-        "simple confidence-based empirical attack baseline.\n\n"
-        + _markdown_table(frame),
+        "simple confidence-based empirical attack baseline.\n\n" + _markdown_table(frame),
         encoding="utf-8",
     )
     metadata = {
