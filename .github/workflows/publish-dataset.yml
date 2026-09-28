@@ -20,6 +20,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: vertimosaic-huggingface-dataset
+  cancel-in-progress: true
+
 jobs:
   publish-dataset:
     runs-on: ubuntu-latest
@@ -46,6 +50,70 @@ jobs:
         run: |
           python huggingface/build_dataset.py --output hf-dataset
           find hf-dataset -maxdepth 3 -type f -print | sort
+
+      - name: Validate Dataset Viewer configurations and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import pandas as pd
+
+          root = Path("hf-dataset")
+          expected = {
+              "core-model-comparison": root / "data" / "core_model_comparison.parquet",
+              "party-ablation": root / "data" / "party_ablation.parquet",
+              "partial-overlap": root / "data" / "partial_overlap.parquet",
+              "party-dropout": root / "data" / "party_dropout.parquet",
+              "feature-drift": root / "data" / "feature_drift.parquet",
+          }
+          missing_files = [name for name, path in expected.items() if not path.is_file()]
+          if missing_files:
+              raise SystemExit(f"missing canonical Viewer files: {missing_files}")
+
+          source_sha = "${{ github.sha }}"
+          for name, path in expected.items():
+              frame = pd.read_parquet(path)
+              if frame.empty:
+                  raise SystemExit(f"{name} is empty")
+              if "source_commit" not in frame.columns:
+                  raise SystemExit(f"{name} lacks source_commit")
+              if set(frame["source_commit"].astype(str)) != {source_sha}:
+                  raise SystemExit(f"{name} source_commit does not match publishing SHA")
+              if "raw_features_pooled" not in frame.columns:
+                  raise SystemExit(f"{name} lacks raw_features_pooled boundary")
+              if frame["raw_features_pooled"].astype(bool).any():
+                  raise SystemExit(f"{name} unexpectedly marks pooled raw features")
+
+          manifest = json.loads((root / "summaries" / "manifest.json").read_text(encoding="utf-8"))
+          if manifest.get("source_commit") != source_sha:
+              raise SystemExit("manifest source_commit does not match publishing SHA")
+          if manifest.get("external_source_rows_included") is not False:
+              raise SystemExit("external source rows must not be redistributed")
+          if manifest.get("ieee_cis_rows_included") is not False:
+              raise SystemExit("IEEE-CIS rows must not be redistributed")
+          if manifest.get("raw_feature_tables_pooled") is not False:
+              raise SystemExit("raw feature tables must not be marked pooled")
+
+          card = (root / "README.md").read_text(encoding="utf-8")
+          required_card_fragments = [
+              "pretty_name: VertiMosaic VFL Benchmark",
+              "default: true",
+              "path: data/core_model_comparison.parquet",
+              "path: data/party_ablation.parquet",
+              "path: data/partial_overlap.parquet",
+              "path: data/party_dropout.parquet",
+              "path: data/feature_drift.parquet",
+              "https://huggingface.co/spaces/sauravsingla08/VertiMosaic",
+              "does **not** claim cryptographic security",
+          ]
+          missing = [fragment for fragment in required_card_fragments if fragment not in card]
+          if missing:
+              raise SystemExit(f"dataset card contract missing: {missing}")
+
+          print("Validated five Viewer configurations, provenance, and privacy boundaries")
+          PY
 
       - name: Install Hugging Face CLI
         run: |
