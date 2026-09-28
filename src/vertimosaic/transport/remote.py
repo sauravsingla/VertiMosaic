@@ -134,18 +134,15 @@ def _decode_value(value: Any) -> Any:
 def _validate_envelope(envelope: Any) -> str | None:
     if not isinstance(envelope, dict):
         return "request body must be a JSON object"
-    required = {
-        "schema_version": int,
-        "message_id": str,
-        "message_type": str,
-        "sender_role": str,
-        "receiver_role": str,
-        "sent_at_unix": (int, float),
-        "nonce": str,
-    }
-    for key, expected in required.items():
+    schema_version = envelope.get("schema_version")
+    if not isinstance(schema_version, int):
+        return "invalid or missing schema_version"
+    sent_at_unix = envelope.get("sent_at_unix")
+    if not isinstance(sent_at_unix, (int, float)):
+        return "invalid or missing sent_at_unix"
+    for key in ("message_id", "message_type", "sender_role", "receiver_role", "nonce"):
         value = envelope.get(key)
-        if not isinstance(value, expected) or (isinstance(value, str) and not value):
+        if not isinstance(value, str) or not value:
             return f"invalid or missing {key}"
     if "payload" not in envelope:
         return "missing payload"
