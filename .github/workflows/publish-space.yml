@@ -20,6 +20,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: vertimosaic-huggingface-space
+  cancel-in-progress: true
+
 jobs:
   publish-space:
     runs-on: ubuntu-latest
@@ -46,6 +50,42 @@ jobs:
         run: |
           python huggingface/build_space.py --output hf-space/data.json
           test -s hf-space/data.json
+
+      - name: Validate Space provenance and claim boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("hf-space/data.json").read_text(encoding="utf-8"))
+          if payload.get("source_commit") != "${{ github.sha }}":
+              raise SystemExit("Space source_commit does not match publishing SHA")
+
+          benchmark = payload.get("benchmark", {})
+          if benchmark.get("raw_feature_tables_pooled") is not False:
+              raise SystemExit("Space must preserve raw-feature locality boundary")
+          if benchmark.get("source_type") != "fully_synthetic":
+              raise SystemExit("Space core benchmark must remain fully_synthetic")
+
+          privacy = str(payload.get("privacy_boundary", ""))
+          for phrase in ("no cryptographic privacy guarantee", "formal differential privacy"):
+              if phrase not in privacy:
+                  raise SystemExit(f"Space privacy boundary missing: {phrase}")
+
+          external = str(payload.get("external_data_boundary", ""))
+          if "No UCI, OpenML or IEEE-CIS source rows are redistributed" not in external:
+              raise SystemExit("Space external-data boundary is missing")
+
+          links = payload.get("links", {})
+          if links.get("dataset") != "https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark":
+              raise SystemExit("Space dataset cross-link is incorrect")
+          if links.get("github") != "https://github.com/sauravsingla/VertiMosaic":
+              raise SystemExit("Space GitHub cross-link is incorrect")
+
+          print("Validated VertiMosaic Space provenance and claim boundaries")
+          PY
 
       - name: Install Hugging Face CLI
         run: |
