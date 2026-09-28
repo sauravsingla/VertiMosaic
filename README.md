@@ -66,7 +66,7 @@ python -m pip install -e .
 vertimosaic demo --rows 2000 --seed 42
 ```
 
-If the project is useful, the best support is simple: **run it, reproduce it, and share what happened**. A GitHub star is also a useful bookmark for following the project.
+If the project is useful, the best support is simple: **run it, reproduce it, and share what happened**.
 
 ## Measured v0.3.0 benchmark snapshot
 
@@ -127,70 +127,46 @@ Maintainer-generated release evidence demonstrates reproducibility of the mainta
 
 ## Technical depth
 
-VertiMosaic keeps the README compact while the full protocol, privacy, benchmark, and reproducibility detail lives in the repository documentation.
+The README summarizes the research surface; detailed protocol, privacy, benchmark, and reproducibility definitions live in the linked documentation.
 
-### Reference protocols
+### Protocols and transport
 
-`VFLLogisticRegression` is a first-principles NumPy reference protocol. Each party computes logits and gradients from its local feature matrix, while protocol signals pass through the explicit message/transport abstraction.
+`VFLLogisticRegression` is a first-principles NumPy reference protocol. `VFLHistGBDT` is a vertical histogram-gradient-boosting reference implementation in which parties retain local training-derived bins and return aggregate histogram candidates plus opaque feature/bin references.
 
-`VFLHistGBDT` is a vertical histogram-gradient-boosting reference implementation. Parties retain local training-derived bins and return aggregate histogram candidates plus opaque feature/bin references; feature owners resolve private numeric thresholds locally.
+`InMemoryTransport` supports deterministic simulation and message auditing. `RemoteHTTPTransport` adds a serialized HTTP path with bounded requests/responses, authorization, replay controls, rate limiting, optional compressed NumPy transport, and signed-message support.
 
-`InMemoryTransport` supports deterministic protocol simulation and message auditing. `RemoteHTTPTransport` provides a serialized HTTP path with bounded requests/responses, authorization, replay controls, rate limiting, optional compressed NumPy transport, and signed-message support.
+Details: [`docs/architecture.md`](docs/architecture.md) · [`docs/protocol.md`](docs/protocol.md)
 
-Full design: [`docs/architecture.md`](docs/architecture.md) · [`docs/protocol.md`](docs/protocol.md)
+### Alignment and protected path
 
-### Alignment and missing-party behavior
+Strict research paths bind ordered pseudonymous entity identifiers to party partitions and derive order-sensitive digests, so same-length inputs can still be rejected when entity identities or ordering differ. Missing trained parties fail by default; the research-only `zero_contribution` fallback must be selected explicitly.
 
-Strict research paths bind ordered pseudonymous entity identifiers to party partitions and derive order-sensitive digests. This can reject same-length inputs when entity identities or ordering differ. Omission of a trained party at inference is an error by default; the research-only `zero_contribution` fallback must be selected explicitly.
-
-Details: [`src/vertimosaic/alignment/`](src/vertimosaic/alignment/) · [`docs/protocol.md`](docs/protocol.md)
-
-### Protected logistic path
-
-The protected logistic workflow can combine configured PSI-based intersection, canonical entity ordering, strict alignment metadata, and clipped-Gaussian protection for active-to-passive residual releases.
-
-Its guarantee is intentionally narrow: PSI follows the selected backend's threat model, and clipped-Gaussian accounting covers the protected residual-release family only. **Logits, model parameters, timing, routing information, other protocol messages, and transport metadata remain outside that composite guarantee.**
+The protected logistic workflow can combine configured PSI-based intersection, canonical entity ordering, strict alignment metadata, and clipped-Gaussian protection for active-to-passive residual releases. Its guarantee is narrow: **logits, model parameters, timing, routing information, other protocol messages, and transport metadata remain outside that composite guarantee.**
 
 Details: [`docs/protected_logistic.md`](docs/protected_logistic.md) · [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md) · [`docs/threat_model.md`](docs/threat_model.md)
 
-### Benchmarks and linkage categories
+### Benchmarks and evaluation
 
-| Benchmark | Linkage category | Purpose |
-|---|---|---|
-| NPI provider benchmark | Real exact multi-source public linkage | Links Open Payments, NPPES, and CMS provider data using NPI |
-| MovieLens 1M | Public exact multi-table linkage | Same service users linked across users, ratings, and movies tables |
-| IEEE-CIS | Authorized local exact linkage | Optional local transaction/identity linkage on `TransactionID` |
-| UCI Credit | Exact-row vertical partition | Public sanity benchmark with disjoint feature columns |
-| Bank / Telecom / Insurance / Retail | Explicitly semi-synthetic cross-domain linkage | Controlled cross-industry research setting |
-| Synthetic scale / overlap | Controlled synthetic study | Scale, overlap, dropout, drift, noise, and distributed-signal experiments |
+| Benchmark | Linkage category |
+|---|---|
+| NPI provider benchmark | Real exact multi-source public linkage |
+| MovieLens 1M | Public exact multi-table linkage |
+| IEEE-CIS | Authorized local exact linkage |
+| UCI Credit | Exact-row vertical partition |
+| Bank / Telecom / Insurance / Retail | Explicitly semi-synthetic cross-domain linkage |
+| Synthetic scale / overlap | Controlled synthetic study |
 
-The four-industry benchmark does **not** claim that its public source datasets describe the same real individuals.
+The four-industry benchmark does **not** claim that its public source datasets describe the same real individuals. Entity-level splits default to **70% train / 15% validation / 15% test**, with threshold selection based on validation predictions only. Standard run bundles capture configuration, provenance, environment versions, predictions, metrics, communication metadata, hashes, timestamps, seed, and Git state.
 
-Details: [`docs/linked_benchmarks.md`](docs/linked_benchmarks.md) · [`docs/npi_linked_benchmark.md`](docs/npi_linked_benchmark.md) · [`docs/linkage.md`](docs/linkage.md)
+Details: [`docs/linked_benchmarks.md`](docs/linked_benchmarks.md) · [`docs/formal_benchmark.md`](docs/formal_benchmark.md) · [`docs/release_evidence.md`](docs/release_evidence.md)
 
-### Evaluation and reproducibility
+### Comparators and privacy boundary
 
-Entity-level splits default to **70% train / 15% validation / 15% test**. Threshold selection uses validation predictions only. Standard evaluation includes ROC-AUC, PR-AUC, precision, recall, F1, balanced accuracy, log loss, Brier score, calibration error, confusion counts, deterministic bootstrap intervals, and paired bootstrap differences.
+VertiMosaic includes a deterministic export/import contract for measured comparisons with frameworks such as **FATE** and **SecretFlow**. A wrapper or exchange format is **not** treated as a measured third-party result; comparator rows remain pending until those frameworks are actually run against the frozen exchange bundle.
 
-`vertimosaic-benchmark-matrix` compares centralized all-feature and Bank-only **non-federated** baselines with `VFLLogisticRegression` and `VFLHistGBDT`. Standard run bundles capture configuration, provenance, environment versions, predictions, metrics, communication metadata, hashes, timestamps, seed, and Git state.
+The default VFL protocols provide raw-feature locality, party-local computation, explicit message boundaries, and auditable research transports. They do **not** automatically provide end-to-end differential privacy, PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, or malicious-party security. Optional research mechanisms exist, but none should be interpreted as a blanket **"secure VFL"** guarantee.
 
-Details: [`docs/formal_benchmark.md`](docs/formal_benchmark.md) · [`docs/release_evidence.md`](docs/release_evidence.md)
-
-### External comparators
-
-VertiMosaic includes a deterministic export/import contract for measured comparisons with frameworks such as **FATE** and **SecretFlow**. A wrapper or exchange format is **not** treated as a measured third-party result; comparator rows remain pending until the external frameworks are actually run against the frozen exchange bundle.
-
-Details: [`docs/external_comparators.md`](docs/external_comparators.md)
-
-### Privacy and security boundary
-
-The default VFL protocols provide raw-feature locality, party-local computation, explicit message boundaries, and auditable research transports. They do **not** automatically provide end-to-end differential privacy, PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, or malicious-party security.
-
-Sensitive derived signals—including gradients, Hessians, logits, residuals, entity membership, routing information, and split statistics—may leak information depending on the observer and protocol.
-
-Optional research mechanisms include `ClippedGaussianDPBackend`, `PairwiseMaskSecureAggregation`, `AdditiveSecretSharingSum`, `OpenMinedPSIBackend`, and `PaillierHomomorphicSum`. None should be interpreted as a blanket **"secure VFL"** guarantee.
-
-Details: [`docs/privacy_backends.md`](docs/privacy_backends.md) · [`docs/privacy_experiments.md`](docs/privacy_experiments.md) · [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md) · [`docs/threat_model.md`](docs/threat_model.md)
+Details: [`docs/external_comparators.md`](docs/external_comparators.md) · [`docs/privacy_backends.md`](docs/privacy_backends.md) · [`docs/privacy_boundaries.md`](docs/privacy_boundaries.md) · [`docs/threat_model.md`](docs/threat_model.md)
 
 ## What is new in v0.3.0
 
