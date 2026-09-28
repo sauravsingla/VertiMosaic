@@ -1,5 +1,11 @@
 """Explicit privacy guarantees, non-guarantees, and empirical leakage research."""
 
+from vertimosaic.privacy.advanced_attacks import (
+    MessageFeatureReconstructionResult,
+    gradient_label_inference,
+    message_feature_reconstruction,
+    privacy_attack_scenarios,
+)
 from vertimosaic.privacy.attacks import (
     MembershipInferenceResult,
     ResidualLabelInferenceResult,
@@ -32,7 +38,7 @@ IMPLEMENTED_PROPERTIES = (
     "party-local preprocessing",
     "protocol separation",
     "pseudonymous research identifiers",
-    "empirical leakage measurement baselines",
+    "empirical membership, label, gradient, routing and feature-reconstruction leakage baselines",
     "multi-seed privacy/utility research sweeps",
     "optional Gaussian release mechanism with zCDP accounting",
     "optional sensitivity-enforcing clipped Gaussian release mechanism",
@@ -59,6 +65,7 @@ __all__ = [
     "GaussianDPBackend",
     "GaussianZCDPAccountant",
     "MembershipInferenceResult",
+    "MessageFeatureReconstructionResult",
     "OpenMinedPSIBackend",
     "PairwiseMaskSecureAggregation",
     "PaillierHomomorphicSum",
@@ -67,6 +74,9 @@ __all__ = [
     "ResidualLabelInferenceResult",
     "RoutingExposureResult",
     "confidence_membership_inference",
+    "gradient_label_inference",
+    "message_feature_reconstruction",
+    "privacy_attack_scenarios",
     "privacy_research_summary_rows",
     "residual_label_inference",
     "routing_membership_exposure",
