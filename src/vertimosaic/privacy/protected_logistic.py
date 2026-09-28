@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol, Sequence
+from typing import Protocol
 
 import numpy as np
 
@@ -31,9 +32,9 @@ class ProtectedLogisticRun:
             "entity_alignment": "PSI intersection supplied by the configured PSI backend",
             "residual_release": residual_report,
             "guarantee_boundary": (
-                "PSI protects the set-intersection operation according to its backend threat model; "
+                "PSI protects set intersection according to its backend threat model; "
                 "clipped Gaussian accounting covers active-to-passive residual releases only. "
-                "Logits, model parameters, timing, routing for other models, and transport metadata "
+                "Logits, model parameters, timing, other-model routing, and transport metadata "
                 "remain outside this composite guarantee."
             ),
         }
