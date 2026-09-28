@@ -68,6 +68,8 @@ vertimosaic demo --rows 2000 --seed 42
 
 If the project is useful, the best support is simple: **run it, reproduce it, and share what happened**.
 
+> **Note:** the measured benchmark below is a separate **800-row formal release run**; it is not the output of the `--rows 2000` quick-start demo above.
+
 ## Measured v0.3.0 benchmark snapshot
 
 The table below is copied from the **machine-generated v0.3.0 formal benchmark evidence** for the core reference run (**800 rows, seed 42**). The first two rows are explicitly **non-federated baselines**; they are not VFL protocols.
