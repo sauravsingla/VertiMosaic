@@ -1,0 +1,25 @@
+{
+  "title": "VertiMosaic",
+  "upload_type": "software",
+  "description": "A reproducible research framework for vertical federated learning on heterogeneous tabular data with explicit privacy boundaries, provenance and communication auditing.",
+  "creators": [
+    {
+      "name": "Singla, Saurav"
+    }
+  ],
+  "access_right": "open",
+  "license": "Apache-2.0",
+  "keywords": [
+    "vertical federated learning",
+    "federated learning",
+    "privacy-preserving machine learning",
+    "tabular data",
+    "reproducible research"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/sauravsingla/VertiMosaic",
+      "relation": "isSupplementTo"
+    }
+  ]
+}

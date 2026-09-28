@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vertimosaic"
-version = "0.1.0"
+version = "0.2.0.dev0"
 description = "CPU-first vertical federated learning research framework for heterogeneous tabular data"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
@@ -67,6 +67,9 @@ dev = [
 
 [project.scripts]
 vertimosaic = "vertimosaic.cli:app"
+vertimosaic-reproduce = "vertimosaic.reproducibility.independent:main"
+vertimosaic-benchmark-matrix = "vertimosaic.experiments.formal_benchmark:main"
+vertimosaic-linked-uci = "vertimosaic.experiments.linked_uci_credit:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/vertimosaic"]

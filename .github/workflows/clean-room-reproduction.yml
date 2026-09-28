@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Clean-room reproducibility
+
+on:
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "src/vertimosaic/**"
+      - "tests/**"
+      - ".github/workflows/clean-room-reproduction.yml"
+  workflow_dispatch:
+
+jobs:
+  wheel-reproduction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: Build wheel without editable install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "build>=1.2,<2"
+          python -m build --wheel
+      - name: Install built wheel into a fresh virtual environment
+        run: |
+          python -m venv /tmp/vertimosaic-repro
+          /tmp/vertimosaic-repro/bin/python -m pip install --upgrade pip
+          /tmp/vertimosaic-repro/bin/python -m pip install dist/vertimosaic-*.whl
+      - name: Reproduce benchmark only from installed wheel
+        working-directory: /tmp
+        run: |
+          /tmp/vertimosaic-repro/bin/vertimosaic-reproduce \
+            --rows 400 \
+            --seed 42 \
+            --logistic-max-iter 40 \
+            --gbdt-estimators 3 \
+            --output /tmp/vertimosaic-reproduction-evidence
+      - name: Retain clean-room evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vertimosaic-clean-room-reproduction
+          path: /tmp/vertimosaic-reproduction-evidence
+          if-no-files-found: error
+          retention-days: 90
