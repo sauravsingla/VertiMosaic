@@ -59,8 +59,7 @@ def _encode_value(value: Any, *, array_codec: str = "json") -> Any:
         return [_encode_value(item, array_codec=array_codec) for item in value]
     if isinstance(value, dict):
         return {
-            str(key): _encode_value(item, array_codec=array_codec)
-            for key, item in value.items()
+            str(key): _encode_value(item, array_codec=array_codec) for key, item in value.items()
         }
     if value.__class__.__name__ == "OpaqueSplitReference" and hasattr(value, "feature_ref"):
         return {
