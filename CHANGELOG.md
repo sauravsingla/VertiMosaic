@@ -24,7 +24,7 @@
   message-to-feature reconstruction baselines covering both passive- and active-party observers.
 - Added wheel-only clean-room reproduction tooling and an independent reproduction evidence
   bundle command with exact environment/version capture and SHA-256 manifests.
-- Added Windows, macOS ARM64 and Linux ARM64 portability smoke CI, optional cryptographic-backend
+- Added Windows, macOS, and Linux ARM64 portability smoke CI, optional cryptographic-backend
   CI, CodeQL, OpenSSF Scorecard, Dependabot and Sigstore-backed GitHub artifact attestations.
 - Added a guarded release branch/tag workflow, CODEOWNERS and documented main-branch integrity
   settings; live branch protection remains a repository-administration setting and must be
