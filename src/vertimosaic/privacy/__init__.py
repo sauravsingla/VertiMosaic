@@ -9,9 +9,16 @@ from vertimosaic.privacy.attacks import (
     routing_membership_exposure,
 )
 from vertimosaic.privacy.backends import (
+    ClippedGaussianDPBackend,
     GaussianDPBackend,
     GaussianZCDPAccountant,
     PrivacyBackendRegistry,
+)
+from vertimosaic.privacy.crypto import (
+    AdditiveSecretSharingSum,
+    OpenMinedPSIBackend,
+    PairwiseMaskSecureAggregation,
+    PaillierHomomorphicSum,
 )
 from vertimosaic.privacy.experiments import run_privacy_audit
 from vertimosaic.privacy.research import (
@@ -28,22 +35,33 @@ IMPLEMENTED_PROPERTIES = (
     "empirical leakage measurement baselines",
     "multi-seed privacy/utility research sweeps",
     "optional Gaussian release mechanism with zCDP accounting",
+    "optional sensitivity-enforcing clipped Gaussian release mechanism",
+    "reference pairwise-mask secure aggregation for integer sums",
+    "reference additive secret-sharing sum primitive",
+    "optional PSI and Paillier adapters when privacy-crypto dependencies are installed",
 )
 
 NOT_GUARANTEED_PROPERTIES = (
-    "cryptographic confidentiality",
+    "cryptographic confidentiality for default VFL protocols",
     "malicious-party security",
     "collusion resistance",
-    "private set intersection",
+    "dropout-resilient secure aggregation",
+    "general-purpose MPC",
+    "homomorphically encrypted end-to-end VFL training",
     "end-to-end formal differential privacy by default",
 )
 
 __all__ = [
     "IMPLEMENTED_PROPERTIES",
     "NOT_GUARANTEED_PROPERTIES",
+    "AdditiveSecretSharingSum",
+    "ClippedGaussianDPBackend",
     "GaussianDPBackend",
     "GaussianZCDPAccountant",
     "MembershipInferenceResult",
+    "OpenMinedPSIBackend",
+    "PairwiseMaskSecureAggregation",
+    "PaillierHomomorphicSum",
     "PrivacyBackendRegistry",
     "PrivacyResearchConfig",
     "ResidualLabelInferenceResult",
