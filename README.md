@@ -75,6 +75,12 @@ The **[VertiMosaic VFL Research Explorer](https://huggingface.co/spaces/sauravsi
 It is generated from the repository benchmark pipeline rather than a hand-entered demo: the current Space build uses a **2,000-row core benchmark**, **1,200-row robustness studies**, **seed 42**, four synthetic party roles, and CPU reference execution. See [`huggingface/build_space.py`](huggingface/build_space.py) for the evidence-generation path.
 
 <p align="center">
+  <a href="https://huggingface.co/spaces/sauravsingla08/VertiMosaic">
+    <img src="assets/vertimosaic-hf-space.webp" alt="VertiMosaic Hugging Face VFL Research Explorer" width="100%">
+  </a>
+</p>
+
+<p align="center">
   <a href="https://huggingface.co/spaces/sauravsingla08/VertiMosaic"><b>Open the live Hugging Face Space →</b></a>
 </p>
 
