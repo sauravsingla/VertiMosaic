@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from vertimosaic.privacy.backends import (
+    ClippedGaussianDPBackend,
     GaussianDPBackend,
     GaussianZCDPAccountant,
     PrivacyBackendRegistry,
@@ -33,7 +34,31 @@ def test_gaussian_backend_is_seed_reproducible_and_reports_scope() -> None:
     assert "end-to-end" in str(report["scope"])
 
 
-def test_privacy_registry_does_not_claim_planned_backends_are_implemented() -> None:
+def test_clipped_gaussian_enforces_message_sensitivity() -> None:
+    backend = ClippedGaussianDPBackend(
+        clip_l2_norm=2.0,
+        noise_multiplier=1.5,
+        adjacency="replace_one",
+        seed=13,
+    )
+    value = np.array([6.0, 8.0])
+    clipped, original_norm = backend.clip(value)
+    assert np.isclose(original_norm, 10.0)
+    assert np.isclose(np.linalg.norm(clipped), 2.0)
+    assert np.isclose(backend.l2_sensitivity, 4.0)
+    released = backend.release(value)
+    assert released.shape == value.shape
+    report = backend.privacy_report(delta=1e-6)
+    assert report["sensitivity_enforcement"] == "L2 clipping before every release"
+    assert report["releases"] == 1
+    assert "message-level" in str(report["scope"])
+
+
+def test_privacy_registry_distinguishes_core_optional_and_larger_protocols() -> None:
     registry = PrivacyBackendRegistry()
-    assert registry.available == ("gaussian-zcdp",)
-    assert "psi" in registry.planned
+    assert "bounded-gaussian-zcdp" in registry.available
+    assert "pairwise-mask-secagg" in registry.available
+    assert "additive-secret-sharing-sum" in registry.available
+    assert "openmined-psi" in registry.optional
+    assert "paillier-homomorphic-sum" in registry.optional
+    assert "general-purpose-mpc" in registry.planned
