@@ -76,6 +76,8 @@ jobs:
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || \
             gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
+          # Deliberately omit --clobber: existing assets make the workflow fail instead
+          # of silently mutating an already-published evidence point.
           gh release upload "$TAG" \
             vertimosaic-release-evidence.tar.gz \
             vertimosaic-release-evidence.tar.gz.sha256 \
@@ -83,5 +85,4 @@ jobs:
             release-evidence/pip-freeze.txt \
             benchmarks/formal_comparison.csv \
             benchmarks/formal_comparison.json \
-            benchmarks/formal_comparison.md \
-            --clobber
+            benchmarks/formal_comparison.md
