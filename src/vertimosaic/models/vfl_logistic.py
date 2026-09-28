@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from vertimosaic.alignment import validate_exact_entity_alignment
 from vertimosaic.parties import ActiveParty, PassiveParty
-from vertimosaic.privacy.backends import ClippedGaussianDPBackend
 from vertimosaic.transport import InMemoryTransport
+
+if TYPE_CHECKING:
+    from vertimosaic.privacy.backends import ClippedGaussianDPBackend
 
 
 def _sigmoid(z: np.ndarray) -> np.ndarray:
@@ -239,7 +242,7 @@ class VFLLogisticRegression:
             self._validate_party_collection(validation_parties, context="validation")
             if tuple(party.name for party in validation_parties) != self.trained_party_names_:
                 raise ValueError(
-                    "validation data must provide the same ordered VFL parties as training"
+                    "validation data must provide the same VFL parties in the same order as training"
                 )
             validation_labels = validation_active.labels
             validation_weights = self._sample_weights(validation_labels)
