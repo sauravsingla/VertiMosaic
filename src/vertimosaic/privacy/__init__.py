@@ -27,6 +27,11 @@ from vertimosaic.privacy.crypto import (
     PairwiseMaskSecureAggregation,
 )
 from vertimosaic.privacy.experiments import run_privacy_audit
+from vertimosaic.privacy.protected_logistic import (
+    ProtectedLogisticRun,
+    fit_protected_logistic,
+    psi_align_parties,
+)
 from vertimosaic.privacy.research import (
     PrivacyResearchConfig,
     privacy_research_summary_rows,
@@ -38,10 +43,12 @@ IMPLEMENTED_PROPERTIES = (
     "party-local preprocessing",
     "protocol separation",
     "pseudonymous research identifiers",
+    "order-sensitive explicit entity-alignment validation",
     "empirical membership, label, gradient, routing and feature-reconstruction leakage baselines",
     "multi-seed privacy/utility research sweeps",
     "optional Gaussian release mechanism with zCDP accounting",
     "optional sensitivity-enforcing clipped Gaussian release mechanism",
+    "explicit PSI plus clipped-Gaussian residual logistic research path",
     "reference pairwise-mask secure aggregation for integer sums",
     "reference additive secret-sharing sum primitive",
     "optional PSI and Paillier adapters when privacy-crypto dependencies are installed",
@@ -71,13 +78,16 @@ __all__ = [
     "PaillierHomomorphicSum",
     "PrivacyBackendRegistry",
     "PrivacyResearchConfig",
+    "ProtectedLogisticRun",
     "ResidualLabelInferenceResult",
     "RoutingExposureResult",
     "confidence_membership_inference",
+    "fit_protected_logistic",
     "gradient_label_inference",
     "message_feature_reconstruction",
     "privacy_attack_scenarios",
     "privacy_research_summary_rows",
+    "psi_align_parties",
     "residual_label_inference",
     "routing_membership_exposure",
     "run_privacy_audit",

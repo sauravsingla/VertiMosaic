@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import psutil
 
+from vertimosaic.alignment import bind_entity_ids, entity_ids_for
 from vertimosaic.baselines import fit_centralized_baseline
 from vertimosaic.datasets import make_vertical_synthetic
 from vertimosaic.evaluation import (
@@ -31,10 +32,15 @@ from vertimosaic.reproducibility import RunArtifacts
 def slice_parties(
     active: ActiveParty, passive: list[PassiveParty], indices: np.ndarray
 ) -> tuple[ActiveParty, list[PassiveParty]]:
-    return (
-        ActiveParty(active.name, active._x[indices], active.labels[indices]),
-        [PassiveParty(item.name, item._x[indices]) for item in passive],
-    )
+    sliced_active = ActiveParty(active.name, active._x[indices], active.labels[indices])
+    sliced_passive = [PassiveParty(item.name, item._x[indices]) for item in passive]
+    source_ids = entity_ids_for(active)
+    if source_ids is not None:
+        selected_ids = source_ids[indices]
+        bind_entity_ids(sliced_active, selected_ids)
+        for party in sliced_passive:
+            bind_entity_ids(party, selected_ids)
+    return sliced_active, sliced_passive
 
 
 def _array_sha256(values: np.ndarray) -> str:
@@ -62,6 +68,7 @@ def _make_model(model_name: str, seed: int) -> VFLLogisticRegression | VFLHistGB
             max_iter=500,
             l2=1e-3,
             early_stopping_rounds=5,
+            require_entity_ids=True,
             seed=seed,
         )
     if model_name == "vfl-hist-gbdt":

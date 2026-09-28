@@ -1,0 +1,179 @@
+services:
+  cert-init:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile
+    command: ["sh", "deploy/compose/generate_certs.sh", "/certs"]
+    volumes:
+      - certs:/certs
+    restart: "no"
+
+  data-init:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile
+    command:
+      - python
+      - deploy/compose/generate_data.py
+      - --root
+      - /data
+      - --rows
+      - "512"
+      - --seed
+      - "42"
+    volumes:
+      - bank-data:/data/bank
+      - telecom-data:/data/telecom
+      - insurance-data:/data/insurance
+      - retail-data:/data/retail
+    restart: "no"
+
+  telecom:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile
+    depends_on:
+      cert-init:
+        condition: service_completed_successfully
+      data-init:
+        condition: service_completed_successfully
+    command:
+      - python
+      - scripts/run_remote_party.py
+      - --role
+      - telecom
+      - --features
+      - /party/features.npy
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8443"
+      - --coordinator-role
+      - bank
+      - --bearer-token
+      - vertimosaic-demo-token
+      - --server-cert
+      - /certs/telecom.pem
+      - --server-key
+      - /certs/telecom-key.pem
+      - --client-ca
+      - /certs/ca.pem
+    volumes:
+      - certs:/certs:ro
+      - telecom-data:/party:ro
+    healthcheck:
+      test: ["CMD-SHELL", "echo | openssl s_client -connect localhost:8443 -cert /certs/bank-client.pem -key /certs/bank-client-key.pem -CAfile /certs/ca.pem -verify_return_error >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  insurance:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile
+    depends_on:
+      cert-init:
+        condition: service_completed_successfully
+      data-init:
+        condition: service_completed_successfully
+    command:
+      - python
+      - scripts/run_remote_party.py
+      - --role
+      - insurance
+      - --features
+      - /party/features.npy
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8443"
+      - --coordinator-role
+      - bank
+      - --bearer-token
+      - vertimosaic-demo-token
+      - --server-cert
+      - /certs/insurance.pem
+      - --server-key
+      - /certs/insurance-key.pem
+      - --client-ca
+      - /certs/ca.pem
+    volumes:
+      - certs:/certs:ro
+      - insurance-data:/party:ro
+    healthcheck:
+      test: ["CMD-SHELL", "echo | openssl s_client -connect localhost:8443 -cert /certs/bank-client.pem -key /certs/bank-client-key.pem -CAfile /certs/ca.pem -verify_return_error >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  retail:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile
+    depends_on:
+      cert-init:
+        condition: service_completed_successfully
+      data-init:
+        condition: service_completed_successfully
+    command:
+      - python
+      - scripts/run_remote_party.py
+      - --role
+      - retail
+      - --features
+      - /party/features.npy
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8443"
+      - --coordinator-role
+      - bank
+      - --bearer-token
+      - vertimosaic-demo-token
+      - --server-cert
+      - /certs/retail.pem
+      - --server-key
+      - /certs/retail-key.pem
+      - --client-ca
+      - /certs/ca.pem
+    volumes:
+      - certs:/certs:ro
+      - retail-data:/party:ro
+    healthcheck:
+      test: ["CMD-SHELL", "echo | openssl s_client -connect localhost:8443 -cert /certs/bank-client.pem -key /certs/bank-client-key.pem -CAfile /certs/ca.pem -verify_return_error >/dev/null 2>&1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  coordinator:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile
+    depends_on:
+      telecom:
+        condition: service_healthy
+      insurance:
+        condition: service_healthy
+      retail:
+        condition: service_healthy
+    command:
+      - python
+      - deploy/compose/run_coordinator.py
+      - --bank-data
+      - /bank-data
+      - --cert-dir
+      - /certs
+      - --output
+      - /output/compose-smoke.json
+    volumes:
+      - certs:/certs:ro
+      - bank-data:/bank-data:ro
+      - ./output:/output
+    restart: "no"
+
+volumes:
+  certs:
+  bank-data:
+  telecom-data:
+  insurance-data:
+  retail-data:
