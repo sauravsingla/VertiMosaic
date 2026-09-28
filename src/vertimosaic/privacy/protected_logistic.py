@@ -78,8 +78,6 @@ def psi_align_parties(
     if not common:
         raise ValueError("PSI intersection is empty")
 
-    # Preserve the active party's canonical entity order even if a PSI backend returns
-    # the intersection in a backend-specific ordering.
     common_set = set(common)
     ordered_common = tuple(value for value in active_ids if value in common_set)
     if not ordered_common:
@@ -125,7 +123,7 @@ def fit_protected_logistic(
     """Run PSI alignment plus clipped-Gaussian residual-release VFL logistic training.
 
     This is an explicitly scoped protected research configuration, not a generic
-    "secure VFL" mode.  The PSI backend protects entity-set intersection according to
+    "secure VFL" mode. The PSI backend protects entity-set intersection according to
     its own threat model, while the DP backend covers only residual messages sent from
     the active party to passive parties.
     """
