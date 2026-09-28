@@ -72,14 +72,14 @@ If the project is useful, the best support is simple: **run it, reproduce it, an
 
 ## Measured v0.3.0 benchmark snapshot
 
-The table below is copied from the **machine-generated v0.3.0 formal benchmark evidence** for the core reference run (**800 rows, seed 42**). The first two rows are explicitly **non-federated baselines**; they are not VFL protocols.
+The table below is copied from the **machine-generated v0.3.0 formal benchmark evidence** for the core reference run (**800 rows, seed 42**). The first two rows are explicitly **non-federated baselines**; they are not VFL protocols. Displayed values are rounded to four decimals for readability; the linked release artifacts retain full precision.
 
 | Model / protocol | Setting | ROC-AUC | PR-AUC | F1 | Train time (s) |
 |---|---|---:|---:|---:|---:|
-| Centralized all features | Non-federated baseline | 0.778613 | 0.776889 | 0.720588 | 0.003723 |
-| Single-party Bank | Non-federated baseline | 0.656642 | 0.624126 | 0.608000 | 0.002952 |
-| `VFLLogisticRegression` | Federated | 0.787246 | 0.785997 | 0.736111 | 0.022221 |
-| `VFLHistGBDT` | Federated | 0.704121 | 0.674868 | 0.662162 | 0.063051 |
+| Centralized all features | Non-federated baseline | 0.7786 | 0.7769 | 0.7206 | 0.0037 |
+| Single-party Bank | Non-federated baseline | 0.6566 | 0.6241 | 0.6080 | 0.0030 |
+| `VFLLogisticRegression` | Federated | 0.7872 | 0.7860 | 0.7361 | 0.0222 |
+| `VFLHistGBDT` | Federated | 0.7041 | 0.6749 | 0.6622 | 0.0631 |
 
 These values are a **single reproducible reference run, not evidence that VFL generally outperforms centralized training and not a cross-framework leaderboard**. Wall-clock time is environment-dependent. The full generated comparison also records inference time, sampled process RSS, protocol payload bytes/message counts, Brier score, and a simple empirical membership-attack baseline. Protocol communication values are application-level payload accounting, not packet captures.
 
