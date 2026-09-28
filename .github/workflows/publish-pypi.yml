@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
   id-token: write
   attestations: write
 
@@ -51,8 +52,8 @@ jobs:
           PY
           )
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "v${VERSION}" ]]; then
-            echo "Tag ${GITHUB_REF_NAME} does not match package version v${VERSION}" >&2
+          if [[ "${GITHUB_REF_TYPE}" != "tag" || "${GITHUB_REF_NAME}" != "v${VERSION}" ]]; then
+            echo "Publishing requires tag v${VERSION}; got ${GITHUB_REF}" >&2
             exit 1
           fi
 
@@ -79,12 +80,12 @@ jobs:
           VERSION: ${{ steps.package.outputs.version }}
         shell: bash
         run: |
+          set -euo pipefail
           TAG="v${VERSION}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "GitHub release $TAG already exists."
-            exit 0
-          fi
-          cat > /tmp/release-notes.md <<EOF
+          else
+            cat > /tmp/release-notes.md <<EOF
           ## VertiMosaic ${TAG}
 
           PyPI release of VertiMosaic, a CPU-first vertical federated learning research framework for heterogeneous tabular data.
@@ -97,7 +98,17 @@ jobs:
 
           The GitHub release is created after successful PyPI publication so a connected Zenodo repository can archive the released source version.
           EOF
-          gh release create "$TAG" \
-            --target "$GITHUB_SHA" \
-            --title "VertiMosaic ${TAG}" \
-            --notes-file /tmp/release-notes.md
+            gh release create "$TAG" \
+              --target "$GITHUB_SHA" \
+              --title "VertiMosaic ${TAG}" \
+              --notes-file /tmp/release-notes.md
+          fi
+
+      - name: Dispatch immutable release evidence after publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run release-evidence.yml --ref "${TAG}"
