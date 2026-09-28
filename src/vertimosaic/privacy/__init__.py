@@ -8,6 +8,11 @@ from vertimosaic.privacy.attacks import (
     residual_label_inference,
     routing_membership_exposure,
 )
+from vertimosaic.privacy.backends import (
+    GaussianDPBackend,
+    GaussianZCDPAccountant,
+    PrivacyBackendRegistry,
+)
 from vertimosaic.privacy.experiments import run_privacy_audit
 from vertimosaic.privacy.research import (
     PrivacyResearchConfig,
@@ -22,6 +27,7 @@ IMPLEMENTED_PROPERTIES = (
     "pseudonymous research identifiers",
     "empirical leakage measurement baselines",
     "multi-seed privacy/utility research sweeps",
+    "optional Gaussian release mechanism with zCDP accounting",
 )
 
 NOT_GUARANTEED_PROPERTIES = (
@@ -29,13 +35,16 @@ NOT_GUARANTEED_PROPERTIES = (
     "malicious-party security",
     "collusion resistance",
     "private set intersection",
-    "formal differential privacy",
+    "end-to-end formal differential privacy by default",
 )
 
 __all__ = [
     "IMPLEMENTED_PROPERTIES",
     "NOT_GUARANTEED_PROPERTIES",
+    "GaussianDPBackend",
+    "GaussianZCDPAccountant",
     "MembershipInferenceResult",
+    "PrivacyBackendRegistry",
     "PrivacyResearchConfig",
     "ResidualLabelInferenceResult",
     "RoutingExposureResult",

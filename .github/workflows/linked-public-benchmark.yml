@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Exact-linked public benchmark
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "47 4 * * 6"
+  pull_request:
+    paths:
+      - "src/vertimosaic/experiments/linked_uci_credit.py"
+      - "src/vertimosaic/datasets/registry.py"
+      - "pyproject.toml"
+      - ".github/workflows/linked-public-benchmark.yml"
+
+jobs:
+  uci-credit-exact-link:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - name: Run provider-backed exact-row linked benchmark
+        run: |
+          vertimosaic-linked-uci \
+            --model logistic \
+            --seed 42 \
+            --bootstrap-replicates 100 \
+            --output reports/uci_credit_exact_linked.json
+      - name: Validate claim boundary and hashes
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("reports/uci_credit_exact_linked.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          linkage = payload["linkage"]
+          assert linkage["same_real_entities_across_parties"] is True
+          assert linkage["single_source_dataset"] is True
+          assert linkage["cross_organization_claim"] is False
+          assert linkage["semi_synthetic"] is False
+          assert linkage["source_column_overlap"] is False
+          assert len(payload["source"]["source_sha256"]) == 64
+          assert Path("reports/uci_credit_exact_linked.json.sha256").is_file()
+          assert Path("reports/uci_credit_exact_linked_predictions.csv").is_file()
+          PY
+      - name: Retain linked benchmark evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vertimosaic-uci-credit-exact-linked
+          path: |
+            reports/uci_credit_exact_linked.json
+            reports/uci_credit_exact_linked.json.sha256
+            reports/uci_credit_exact_linked_predictions.csv
+          if-no-files-found: error
+          retention-days: 90
