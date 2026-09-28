@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0 — 2026-09-28
+
+- Added order-sensitive entity IDs/digests and strict alignment validation across fit,
+  validation and inference paths so row permutations cannot silently train as aligned data.
+- Made VFL logistic missing-party inference explicit with `error` as the default policy and
+  opt-in zero-contribution behavior for controlled robustness research.
+- Integrated clipped-Gaussian residual releases and privacy accounting into an actual logistic
+  VFL path, plus a scoped PSI alignment + protected logistic research configuration.
+- Added a deterministic external-framework benchmark exchange and normalized comparator contract
+  for measured FATE, SecretFlow or other VFL implementations without fabricating external results.
+- Added independent-reproduction submission, attestation and validation tooling so unaffiliated
+  researchers can publish machine-verifiable reproduction evidence.
+- Added an exact-NPI public multi-source benchmark builder spanning Open Payments, NPPES and CMS
+  provider data with conservative linkage, licensing and redistribution boundaries.
+- Expanded limitations and non-guarantees covering entity linkage, honest-but-curious assumptions,
+  collusion, gradient/Hessian and routing leakage, poisoning, scalability, fairness/domain shift,
+  deployment boundaries and compliance non-claims.
+- Added canonical measured-result indexing and release-evidence packaging with environment,
+  checksums and generated publication artifacts.
+- Added a technical preprint plus new research questions for external comparators, protected VFL
+  and exact-NPI linkage.
+- Added four focused first-user tutorials and a deterministic multi-service Docker Compose example
+  with separate party services, HTTPS/mTLS options, bearer authentication and health checks.
+- Fixed Hugging Face dataset publication validation to use single-threaded PyArrow parquet reads,
+  avoiding a Linux CI interpreter-shutdown abort after otherwise successful validation.
+
 ## 0.2.0 — 2026-09-28
 
 - Added a formal four-protocol benchmark matrix covering centralized, single-party, VFL
