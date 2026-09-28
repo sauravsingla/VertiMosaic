@@ -5,6 +5,10 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - main
+    paths:
+      - ".github/workflows/release-evidence.yml"
   workflow_dispatch:
     inputs:
       release_tag:
@@ -23,7 +27,37 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-          ref: ${{ inputs.release_tag || github.ref }}
+      - name: Select immutable release source
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="$REQUESTED_TAG"
+          if [[ -z "$tag" && "$EVENT_REF" == refs/tags/* ]]; then
+            tag="$EVENT_REF_NAME"
+          fi
+          if [[ -z "$tag" && "$EVENT_REF" == "refs/heads/main" ]]; then
+            version="$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          print(tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])
+          PY
+          )"
+            tag="v${version}"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "invalid or missing release tag: $tag" >&2
+            exit 1
+          fi
+          git rev-parse "refs/tags/${tag}^{commit}" >/dev/null
+          git checkout --force "refs/tags/${tag}"
+          source_sha="$(git rev-parse HEAD)"
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          echo "RELEASE_SOURCE_SHA=$source_sha" >> "$GITHUB_ENV"
+          echo "Reproducing immutable release $tag at $source_sha"
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
@@ -78,6 +112,8 @@ jobs:
           mkdir -p release-evidence
           python -m pip freeze --all | LC_ALL=C sort > release-evidence/pip-freeze.txt
           python -VV > release-evidence/python.txt
+          printf '%s\n' "$RELEASE_TAG" > release-evidence/release-tag.txt
+          printf '%s\n' "$RELEASE_SOURCE_SHA" > release-evidence/release-source-sha.txt
       - name: Build hashed evidence and canonical-result indexes
         run: python scripts/build_release_evidence.py
       - name: Package immutable release evidence
@@ -90,7 +126,7 @@ jobs:
             release-evidence benchmarks reports paper/preprint.md \
             reproducibility/requirements-py312.lock
           sha256sum vertimosaic-release-evidence.tar.gz > vertimosaic-release-evidence.tar.gz.sha256
-      - name: Retain canonical measured evidence for manual runs and pull requests
+      - name: Retain canonical measured evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: vertimosaic-release-evidence-${{ github.sha }}
@@ -99,6 +135,9 @@ jobs:
             vertimosaic-release-evidence.tar.gz.sha256
             release-evidence/manifest.json
             release-evidence/canonical-results.json
+            release-evidence/pip-freeze.txt
+            release-evidence/release-tag.txt
+            release-evidence/release-source-sha.txt
             benchmarks/
             reports/
             results/
@@ -108,10 +147,9 @@ jobs:
           if-no-files-found: error
           retention-days: 90
       - name: Publish GitHub Release assets for tag
-        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.release_tag || github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || \
             gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
@@ -121,6 +159,8 @@ jobs:
             release-evidence/manifest.json \
             release-evidence/canonical-results.json \
             release-evidence/pip-freeze.txt \
+            release-evidence/release-tag.txt \
+            release-evidence/release-source-sha.txt \
             benchmarks/formal_comparison.csv \
             benchmarks/formal_comparison.json \
             benchmarks/formal_comparison.md \
