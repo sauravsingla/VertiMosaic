@@ -17,7 +17,10 @@ from vertimosaic.reproducibility.run import environment_snapshot, file_sha256
 def _installed_distributions() -> list[str]:
     items: set[str] = set()
     for distribution in metadata.distributions():
-        name = distribution.metadata.get("Name")
+        try:
+            name = distribution.metadata["Name"]
+        except KeyError:
+            continue
         version = distribution.version
         if isinstance(name, str) and name.strip():
             items.add(f"{name.strip()}=={version}")
