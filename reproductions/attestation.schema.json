@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sauravsingla/VertiMosaic/reproductions/attestation.schema.json",
+  "title": "VertiMosaic independent reproduction attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "reproducer",
+    "affiliation",
+    "relationship_to_project",
+    "independent",
+    "release_version",
+    "package_source",
+    "unpublished_maintainer_changes_used"
+  ],
+  "properties": {
+    "reproducer": {"type": "string", "minLength": 1},
+    "affiliation": {"type": "string", "minLength": 1},
+    "relationship_to_project": {"type": "string", "minLength": 1},
+    "independent": {"type": "boolean"},
+    "release_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([.-].*)?$"},
+    "package_source": {"type": "string", "enum": ["PyPI", "GitHub release", "other public release source"]},
+    "unpublished_maintainer_changes_used": {"type": "boolean"},
+    "notes": {"type": "string"}
+  }
+}
