@@ -238,7 +238,9 @@ class VFLLogisticRegression:
             validation_parties = [validation_active, *validation_passive]
             self._validate_party_collection(validation_parties, context="validation")
             if tuple(party.name for party in validation_parties) != self.trained_party_names_:
-                raise ValueError("validation data must provide the same ordered VFL parties as training")
+                raise ValueError(
+                    "validation data must provide the same ordered VFL parties as training"
+                )
             validation_labels = validation_active.labels
             validation_weights = self._sample_weights(validation_labels)
             if not np.isfinite(validation_weights).all() or float(validation_weights.sum()) <= 0.0:
