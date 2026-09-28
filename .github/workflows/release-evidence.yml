@@ -6,6 +6,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Optional immutable release tag to reproduce and attach evidence for"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -18,6 +23,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          ref: ${{ inputs.release_tag || github.ref }}
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
@@ -25,6 +31,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r reproducibility/requirements-py312.lock
+          # ucimlrepo 0.0.6 imports certifi but its published metadata does not
+          # reliably pull it into this historical pinned environment. Keep the
+          # release rerun deterministic even when reproducing an immutable tag
+          # whose lock predates the explicit certifi pin.
+          pip install certifi==2026.7.22
           pip install -e . --no-deps
       - name: Run reproducible CPU evidence pipeline
         run: python scripts/reproduce_paper.py --smoke
@@ -97,14 +108,14 @@ jobs:
           if-no-files-found: error
           retention-days: 90
       - name: Publish GitHub Release assets for tag
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || \
             gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
-          gh release upload "$TAG" \
+          gh release upload "$TAG" --clobber \
             vertimosaic-release-evidence.tar.gz \
             vertimosaic-release-evidence.tar.gz.sha256 \
             release-evidence/manifest.json \
