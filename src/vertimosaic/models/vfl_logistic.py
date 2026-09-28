@@ -4,7 +4,9 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from vertimosaic.alignment import validate_exact_entity_alignment
 from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.privacy.backends import ClippedGaussianDPBackend
 from vertimosaic.transport import InMemoryTransport
 
 
@@ -21,10 +23,20 @@ class VFLLogisticRegression:
     objective. Mini-batches are entity-aligned across every party and are
     shuffled deterministically from ``seed``. Passive-party logit contributions
     and residual signals cross the simulated ``Message`` transport boundary;
-    raw party feature matrices remain local. ``residual_noise_std`` optionally
-    adds deterministic Gaussian noise only to residuals sent to passive parties,
-    enabling empirical privacy/utility mitigation experiments without changing
-    the active party's target-owned gradient or intercept update.
+    raw party feature matrices remain local.
+
+    ``require_entity_ids`` enables protocol-boundary verification of exact ordered
+    entity alignment. Official VertiMosaic research/reproduction entry points enable
+    it. The low-level class keeps ``False`` as a backwards-compatibility bridge for
+    callers that have not yet bound identifiers with ``bind_entity_ids``.
+
+    ``missing_party_policy='error'`` is the default and rejects incomplete inference.
+    ``zero_contribution`` is an explicit research fallback that treats absent passive
+    parties as contributing zero logits; the active party may never be omitted.
+
+    ``residual_dp_backend`` can apply the executable clipped-Gaussian message-level
+    release mechanism to residual messages sent to passive parties. This protects that
+    release only and is not an end-to-end VFL privacy claim.
     """
 
     learning_rate: float = 0.1
@@ -39,6 +51,9 @@ class VFLLogisticRegression:
     early_stopping_rounds: int | None = None
     warm_start: bool = False
     residual_noise_std: float = 0.0
+    residual_dp_backend: ClippedGaussianDPBackend | None = None
+    require_entity_ids: bool = False
+    missing_party_policy: str = "error"
     seed: int = 42
     transport: InMemoryTransport = field(default_factory=InMemoryTransport)
     weights_: dict[str, np.ndarray] = field(default_factory=dict, init=False)
@@ -48,6 +63,8 @@ class VFLLogisticRegression:
     n_iter_: int = field(default=0, init=False)
     converged_: bool = field(default=False, init=False)
     best_iteration_: int | None = field(default=None, init=False)
+    trained_party_names_: tuple[str, ...] = field(default=(), init=False)
+    active_party_name_: str | None = field(default=None, init=False)
 
     def _validate_hyperparameters(self) -> None:
         if self.learning_rate <= 0:
@@ -68,6 +85,10 @@ class VFLLogisticRegression:
             raise ValueError("early_stopping_rounds must be positive when supplied")
         if not np.isfinite(self.residual_noise_std) or self.residual_noise_std < 0:
             raise ValueError("residual_noise_std must be finite and non-negative")
+        if self.residual_noise_std > 0.0 and self.residual_dp_backend is not None:
+            raise ValueError("residual_noise_std and residual_dp_backend are mutually exclusive")
+        if self.missing_party_policy not in {"error", "zero_contribution"}:
+            raise ValueError("missing_party_policy must be error or zero_contribution")
         if isinstance(self.class_weight, str) and self.class_weight != "balanced":
             raise ValueError("class_weight string must be 'balanced'")
         if isinstance(self.class_weight, dict) and any(
@@ -96,6 +117,29 @@ class VFLLogisticRegression:
             fraction = max(0.05, 1.0 - epoch / max(self.max_iter, 1))
             return self.learning_rate * fraction
         return self.learning_rate
+
+    def _validate_party_collection(
+        self,
+        parties: list[PassiveParty],
+        *,
+        context: str,
+        require_entity_ids: bool | None = None,
+    ) -> None:
+        if not parties:
+            raise ValueError(f"{context}: at least one party is required")
+        names = [party.name for party in parties]
+        if len(set(names)) != len(names):
+            raise ValueError(f"{context}: party names must be unique")
+        n = parties[0].n_rows
+        if any(party.n_rows != n for party in parties):
+            raise ValueError(f"{context}: all VFL parties must align to the same row count")
+        validate_exact_entity_alignment(
+            parties,
+            context=context,
+            require_bound_ids=self.require_entity_ids
+            if require_entity_ids is None
+            else require_entity_ids,
+        )
 
     def _initialize(self, parties: list[PassiveParty]) -> None:
         expected = {party.name: party.n_features for party in parties}
@@ -166,9 +210,10 @@ class VFLLogisticRegression:
     ) -> VFLLogisticRegression:
         self._validate_hyperparameters()
         parties: list[PassiveParty] = [active, *passive]
+        self._validate_party_collection(parties, context="training")
+        self.active_party_name_ = active.name
+        self.trained_party_names_ = tuple(party.name for party in parties)
         n = active.n_rows
-        if any(party.n_rows != n for party in parties):
-            raise ValueError("all VFL parties must align to the same row count")
         if self.early_stopping_rounds is not None and validation_active is None:
             raise ValueError("validation data are required when early stopping is enabled")
         self._initialize(parties)
@@ -191,11 +236,9 @@ class VFLLogisticRegression:
         if validation_active is not None:
             validation_passive = validation_passive or []
             validation_parties = [validation_active, *validation_passive]
-            if {party.name for party in validation_parties} != {party.name for party in parties}:
-                raise ValueError("validation data must provide the same VFL parties as training")
-            validation_n = validation_active.n_rows
-            if any(party.n_rows != validation_n for party in validation_parties):
-                raise ValueError("validation parties must align to the same row count")
+            self._validate_party_collection(validation_parties, context="validation")
+            if tuple(party.name for party in validation_parties) != self.trained_party_names_:
+                raise ValueError("validation data must provide the same ordered VFL parties as training")
             validation_labels = validation_active.labels
             validation_weights = self._sample_weights(validation_labels)
             if not np.isfinite(validation_weights).all() or float(validation_weights.sum()) <= 0.0:
@@ -228,14 +271,13 @@ class VFLLogisticRegression:
                 if batch_weight_sum <= 0.0:
                     raise ValueError("every optimization batch must have positive total weight")
                 residual = (batch_probs - y[batch]) * batch_weights
-                # PassiveParty.local_gradient divides by len(batch), so rescale the
-                # weighted residuals such that the resulting gradient is normalized by
-                # sum(batch_weights), exactly matching the weighted-average objective.
                 residual *= len(batch) / batch_weight_sum
                 delivered_residuals: dict[str, np.ndarray] = {active.name: residual}
                 for party in passive:
                     party_residual = residual
-                    if self.residual_noise_std > 0.0:
+                    if self.residual_dp_backend is not None:
+                        party_residual = self.residual_dp_backend.release(residual)
+                    elif self.residual_noise_std > 0.0:
                         party_residual = residual + noise_rng.normal(
                             scale=self.residual_noise_std,
                             size=residual.shape,
@@ -301,8 +343,6 @@ class VFLLogisticRegression:
         elif self.best_iteration_ is None and self.n_iter_:
             self.best_iteration_ = self.n_iter_ - 1
 
-        # Ensure the final recorded training objective corresponds to the model
-        # parameters actually returned, including early-stopping restoration.
         final_probability = _sigmoid(self._logits(parties, stage="final_training"))
         final_loss = self._loss(y, final_probability, sample_weight)
         if self.loss_history_:
@@ -311,18 +351,33 @@ class VFLLogisticRegression:
             self.loss_history_.append(final_loss)
         return self
 
-    def decision_function(self, parties: list[PassiveParty]) -> np.ndarray:
-        if not self.weights_:
+    def _inference_parties(self, parties: list[PassiveParty]) -> list[PassiveParty]:
+        if not self.weights_ or not self.trained_party_names_ or self.active_party_name_ is None:
             raise RuntimeError("model is not fitted")
         if not parties:
             raise ValueError("at least one party is required")
-        n = parties[0].n_rows
-        if any(party.n_rows != n for party in parties):
-            raise ValueError("inference parties must have equal row counts")
-        for party in parties:
-            if party.name not in self.weights_:
-                raise ValueError(f"unknown inference party: {party.name}")
-        return self._logits(parties, stage="inference")
+        by_name = {party.name: party for party in parties}
+        if len(by_name) != len(parties):
+            raise ValueError("inference party names must be unique")
+        unknown = set(by_name) - set(self.trained_party_names_)
+        if unknown:
+            raise ValueError(f"unknown inference parties: {sorted(unknown)}")
+        if self.active_party_name_ not in by_name:
+            raise ValueError("the active party cannot be omitted at inference")
+        missing = set(self.trained_party_names_) - set(by_name)
+        if missing and self.missing_party_policy == "error":
+            raise ValueError(
+                "missing inference parties: " + ", ".join(sorted(missing)) + "; "
+                "set missing_party_policy='zero_contribution' only for an explicitly "
+                "evaluated fallback configuration"
+            )
+        ordered = [by_name[name] for name in self.trained_party_names_ if name in by_name]
+        self._validate_party_collection(ordered, context="inference")
+        return ordered
+
+    def decision_function(self, parties: list[PassiveParty]) -> np.ndarray:
+        ordered = self._inference_parties(parties)
+        return self._logits(ordered, stage="inference")
 
     def predict_proba(self, parties: list[PassiveParty]) -> np.ndarray:
         probability = _sigmoid(self.decision_function(parties))
@@ -330,3 +385,14 @@ class VFLLogisticRegression:
 
     def predict(self, parties: list[PassiveParty], threshold: float = 0.5) -> np.ndarray:
         return (self.predict_proba(parties)[:, 1] >= threshold).astype(int)
+
+    def privacy_report(self, *, delta: float) -> dict[str, float | int | str] | None:
+        """Return accounting for the optional residual message mechanism, if enabled."""
+        if self.residual_dp_backend is None:
+            return None
+        report = self.residual_dp_backend.privacy_report(delta=delta)
+        report["protected_message"] = "active-to-passive residual_signal"
+        report["non_guarantee"] = (
+            "other VFL messages are outside this mechanism; this is not end-to-end VFL DP"
+        )
+        return report
