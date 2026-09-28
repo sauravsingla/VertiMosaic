@@ -58,7 +58,14 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-          import pandas as pd
+
+          import pyarrow as pa
+          import pyarrow.parquet as pq
+
+          # Keep Parquet validation single-threaded. This avoids an Arrow worker-pool
+          # teardown crash that can occur after successful reads during interpreter
+          # shutdown on Linux CI runners.
+          pa.set_cpu_count(1)
 
           root = Path("hf-dataset")
           expected = {
@@ -74,16 +81,17 @@ jobs:
 
           source_sha = "${{ github.sha }}"
           for name, path in expected.items():
-              frame = pd.read_parquet(path)
-              if frame.empty:
+              table = pq.read_table(path, use_threads=False)
+              if table.num_rows == 0:
                   raise SystemExit(f"{name} is empty")
-              if "source_commit" not in frame.columns:
+              if "source_commit" not in table.column_names:
                   raise SystemExit(f"{name} lacks source_commit")
-              if set(frame["source_commit"].astype(str)) != {source_sha}:
+              source_commits = {str(value) for value in table.column("source_commit").to_pylist()}
+              if source_commits != {source_sha}:
                   raise SystemExit(f"{name} source_commit does not match publishing SHA")
-              if "raw_features_pooled" not in frame.columns:
+              if "raw_features_pooled" not in table.column_names:
                   raise SystemExit(f"{name} lacks raw_features_pooled boundary")
-              if frame["raw_features_pooled"].astype(bool).any():
+              if any(bool(value) for value in table.column("raw_features_pooled").to_pylist()):
                   raise SystemExit(f"{name} unexpectedly marks pooled raw features")
 
           manifest = json.loads((root / "summaries" / "manifest.json").read_text(encoding="utf-8"))
