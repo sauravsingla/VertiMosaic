@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-from pathlib import Path
+import pathlib
 
 
 REQUIRED_FILES = (
@@ -27,7 +27,7 @@ REQUIRED_ATTESTATION_FIELDS = (
 )
 
 
-def _sha256(path: Path) -> str:
+def _sha256(path: pathlib.Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -35,7 +35,7 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _parse_sha256sums(path: Path) -> dict[str, str]:
+def _parse_sha256sums(path: pathlib.Path) -> dict[str, str]:
     entries: dict[str, str] = {}
     for raw in path.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
@@ -52,7 +52,7 @@ def _parse_sha256sums(path: Path) -> dict[str, str]:
     return entries
 
 
-def validate(directory: Path) -> dict[str, object]:
+def validate(directory: pathlib.Path) -> dict[str, object]:
     directory = directory.resolve()
     missing = [name for name in REQUIRED_FILES if not (directory / name).is_file()]
     if missing:
@@ -110,7 +110,7 @@ def validate(directory: Path) -> dict[str, object]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate a VertiMosaic reproduction record")
-    parser.add_argument("directory", type=Path)
+    parser.add_argument("directory", type=pathlib.Path)
     args = parser.parse_args()
     print(json.dumps(validate(args.directory), indent=2, sort_keys=True))
 
