@@ -14,14 +14,13 @@ def test_gaussian_zcdp_accounting_composes_releases() -> None:
     accountant.step(3)
     assert accountant.releases == 3
     assert np.isclose(accountant.rho, 3.0 / 8.0)
-    epsilon = accountant.epsilon(1e-6)
+    epsilon = accountant.epsilon(delta=1e-6)
     assert np.isfinite(epsilon)
     assert epsilon > 0.0
 
 
 def test_gaussian_backend_is_seed_reproducible_and_reports_scope() -> None:
-    values = np.array([1.0, -2.0, 3.0])
-    first = GaussianDPBackend(l2_sensitivity=1.5, noise_multiplier=2.0, seed=7)
+    values = np.array([1.0, -2.0, 3.0])n    first = GaussianDPBackend(l2_sensitivity=1.5, noise_multiplier=2.0, seed=7)
     second = GaussianDPBackend(l2_sensitivity=1.5, noise_multiplier=2.0, seed=7)
     released_first = first.release(values)
     released_second = second.release(values)
