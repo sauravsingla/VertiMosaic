@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -24,7 +25,10 @@ def _sha256(path: Path) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Export a frozen VertiMosaic benchmark exchange bundle for external VFL frameworks"
+        description=(
+            "Export a frozen VertiMosaic benchmark exchange bundle for external VFL "
+            "frameworks"
+        )
     )
     parser.add_argument("--rows", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=42)
@@ -46,9 +50,11 @@ def main() -> None:
         split_directory = args.output / split_name
         split_directory.mkdir(parents=True, exist_ok=True)
         split_parties = [split_active, *split_passive]
-        split_record: dict[str, object] = {"rows": split_active.n_rows, "parties": {}}
-        party_record = split_record["parties"]
-        assert isinstance(party_record, dict)
+        party_record: dict[str, Any] = {}
+        split_record: dict[str, Any] = {
+            "rows": split_active.n_rows,
+            "parties": party_record,
+        }
         for party in split_parties:
             path = split_directory / f"{party.name}.npy"
             np.save(path, party._x, allow_pickle=False)
@@ -78,7 +84,10 @@ def main() -> None:
         "target_owner": active.name,
         "split": files,
         "parties": {
-            party.name: {"features": party.n_features, "role": "active" if party is active else "passive"}
+            party.name: {
+                "features": party.n_features,
+                "role": "active" if party is active else "passive",
+            }
             for party in [active, *passive]
         },
         "fairness_contract": (
@@ -87,7 +96,10 @@ def main() -> None:
         ),
     }
     manifest_path = args.output / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(manifest_path)
 
 
