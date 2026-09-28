@@ -68,11 +68,21 @@ vertimosaic demo --rows 2000 --seed 42
 
 If the project is useful, the best support is simple: **run it, reproduce it, and share what happened**.
 
+### Explore the live benchmark dashboard
+
+The **[VertiMosaic VFL Research Explorer](https://huggingface.co/spaces/sauravsingla08/VertiMosaic)** provides an interactive view of the maintained synthetic benchmark evidence, including model comparison, party contribution, entity overlap, party dropout, feature drift, and systems/provenance views.
+
+It is generated from the repository benchmark pipeline rather than a hand-entered demo: the current Space build uses a **2,000-row core benchmark**, **1,200-row robustness studies**, **seed 42**, four synthetic party roles, and CPU reference execution. See [`huggingface/build_space.py`](huggingface/build_space.py) for the evidence-generation path.
+
+<p align="center">
+  <a href="https://huggingface.co/spaces/sauravsingla08/VertiMosaic"><b>Open the live Hugging Face Space →</b></a>
+</p>
+
 > **Note:** the measured benchmark below is a separate **800-row formal release run**; it is not the output of the `--rows 2000` quick-start demo above.
 
 ## Measured v0.3.0 benchmark snapshot
 
-The table below is copied from the **machine-generated v0.3.0 formal benchmark evidence** for the core reference run (**800 rows, seed 42**). The first two rows are explicitly **non-federated baselines**; they are not VFL protocols. Displayed values are rounded to four decimals for readability; the linked release artifacts retain full precision.
+The table below is summarized from the **machine-generated v0.3.0 formal benchmark evidence** for the core reference run (**800 rows, seed 42**). The first two rows are explicitly **non-federated baselines**; they are not VFL protocols. Displayed values are rounded to four decimals for readability; the linked release artifacts retain full precision.
 
 | Model / protocol | Setting | ROC-AUC | PR-AUC | F1 | Train time (s) |
 |---|---|---:|---:|---:|---:|
