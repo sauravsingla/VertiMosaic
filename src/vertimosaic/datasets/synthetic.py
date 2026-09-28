@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from vertimosaic.alignment import bind_entity_ids
 from vertimosaic.parties import ActiveParty, PassiveParty
 
 
@@ -35,4 +36,10 @@ def make_vertical_synthetic(
         PassiveParty("insurance", xs[2]),
         PassiveParty("retail", xs[3]),
     ]
+    # Synthetic rows represent the same latent entities across every vertical party.
+    # Bind an explicit ordered identifier so model-boundary alignment checks are real,
+    # not inferred from row counts alone.
+    entity_ids = np.asarray([f"synthetic-{index:012d}" for index in range(n_rows)], dtype=str)
+    for party in [active, *passive]:
+        bind_entity_ids(party, entity_ids)
     return active, passive
