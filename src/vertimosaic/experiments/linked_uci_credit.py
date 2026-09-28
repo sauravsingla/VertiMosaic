@@ -221,7 +221,7 @@ def run_uci_credit_linked_experiment(
     output.parent.mkdir(parents=True, exist_ok=True)
     predictions_path = output.with_name(output.stem + "_predictions.csv")
     pseudonyms = [
-        sha256(f"uci350:{int(index)}".encode("utf-8")).hexdigest()[:20]
+        sha256(f"uci350:{int(index)}".encode()).hexdigest()[:20]
         for index in prepared["test_source_rows"]
     ]
     pd.DataFrame(
