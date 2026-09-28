@@ -1,0 +1,91 @@
+site_name: VertiMosaic
+site_description: CPU-first vertical federated learning research framework for heterogeneous tabular data
+site_url: https://sauravsingla.github.io/VertiMosaic/
+repo_url: https://github.com/sauravsingla/VertiMosaic
+repo_name: sauravsingla/VertiMosaic
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; Saurav Singla. Apache-2.0 licensed.
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.code.annotate
+    - content.action.edit
+    - search.highlight
+    - search.suggest
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            members_order: source
+            show_root_heading: true
+            show_source: true
+            separate_signature: true
+            signature_crossrefs: true
+
+nav:
+  - Home: index.md
+  - Quick Start: quickstart.md
+  - Architecture: architecture.md
+  - Protocol: protocol.md
+  - Privacy:
+      - Boundaries: privacy_boundaries.md
+      - Threat Model: threat_model.md
+      - Research Backends: privacy_backends.md
+      - Protected Logistic: protected_logistic.md
+      - Privacy Experiments: privacy_experiments.md
+  - Benchmarks:
+      - Overview: benchmarks.md
+      - Linked Benchmarks: linked_benchmarks.md
+      - Exact-NPI Benchmark: npi_linked_benchmark.md
+      - Formal Benchmark: formal_benchmark.md
+      - External Comparators: external_comparators.md
+  - Reproduction:
+      - Reproducibility: reproducibility.md
+      - Independent Reproduction: independent_reproduction.md
+      - Release Evidence: release_evidence.md
+      - Release Policy: release_policy.md
+  - API Reference: api.md
+  - Limitations: limitations.md
