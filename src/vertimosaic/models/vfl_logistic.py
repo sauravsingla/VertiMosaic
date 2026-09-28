@@ -362,6 +362,9 @@ class VFLLogisticRegression:
             raise RuntimeError("model is not fitted")
         if not parties:
             raise ValueError("at least one party is required")
+        n_rows = parties[0].n_rows
+        if any(party.n_rows != n_rows for party in parties):
+            raise ValueError("inference parties must have equal row counts")
         by_name = {party.name: party for party in parties}
         if len(by_name) != len(parties):
             raise ValueError("inference party names must be unique")
