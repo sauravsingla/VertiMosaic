@@ -68,7 +68,8 @@ def run_advanced_privacy_audit(
         "feature_reconstruction_party": first_test.name,
         "claim_boundary": (
             "These are empirical baseline attacks against explicit reference-protocol messages. "
-            "Positive leakage demonstrates an attack surface; weak baseline results do not prove privacy."
+            "Positive leakage demonstrates an attack surface; weak baseline results do not "
+            "prove privacy."
         ),
     }
     output.parent.mkdir(parents=True, exist_ok=True)
