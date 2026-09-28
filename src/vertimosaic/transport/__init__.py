@@ -5,7 +5,11 @@ from vertimosaic.transport.core import (
     StructuredPayload,
     Transport,
 )
-from vertimosaic.transport.remote import ReferenceRelayServer, RemoteHTTPTransport
+from vertimosaic.transport.remote import (
+    ReferenceRelayServer,
+    RemoteHTTPTransport,
+    RemoteNetworkEvent,
+)
 
 __all__ = [
     "AuditEvent",
@@ -13,6 +17,7 @@ __all__ = [
     "Message",
     "ReferenceRelayServer",
     "RemoteHTTPTransport",
+    "RemoteNetworkEvent",
     "StructuredPayload",
     "Transport",
 ]

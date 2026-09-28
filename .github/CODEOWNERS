@@ -1,0 +1,12 @@
+# Repository-wide default ownership
+* @sauravsingla
+
+# High-integrity research and release surfaces
+/.github/workflows/ @sauravsingla
+/pyproject.toml @sauravsingla
+/reproducibility/ @sauravsingla
+/src/vertimosaic/privacy/ @sauravsingla
+/src/vertimosaic/transport/ @sauravsingla
+/src/vertimosaic/reproducibility/ @sauravsingla
+/docs/release_policy.md @sauravsingla
+/SECURITY.md @sauravsingla

@@ -1,0 +1,87 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Create validated release tag
+
+on:
+  push:
+    branches:
+      - "release/v*"
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Validate version branch and main commit
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          print(tomllib.loads(Path('pyproject.toml').read_text())['project']['version'])
+          PY
+          )
+          EXPECTED_BRANCH="release/v${VERSION}"
+          if [[ "${GITHUB_REF_NAME}" != "${EXPECTED_BRANCH}" ]]; then
+            echo "Release branch ${GITHUB_REF_NAME} does not match ${EXPECTED_BRANCH}" >&2
+            exit 1
+          fi
+          if [[ "${VERSION}" == *dev* || "${VERSION}" == *rc* ]]; then
+            echo "Release branch may only tag a final version" >&2
+            exit 1
+          fi
+          git fetch origin main --depth=1
+          MAIN_SHA=$(git rev-parse origin/main)
+          if [[ "${GITHUB_SHA}" != "${MAIN_SHA}" ]]; then
+            echo "Release branch must point exactly at current main" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+      - name: Create immutable release tag reference
+        id: tag
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXISTING=$(git ls-remote --tags origin "refs/tags/${TAG}^{}" | awk '{print $1}')
+          if [[ -z "${EXISTING}" ]]; then
+            DIRECT=$(git ls-remote --tags origin "refs/tags/${TAG}" | awk '{print $1}')
+            if [[ -n "${DIRECT}" ]]; then
+              git fetch origin "refs/tags/${TAG}:refs/tags/${TAG}"
+              EXISTING=$(git rev-list -n 1 "${TAG}")
+            fi
+          fi
+          if [[ -n "${EXISTING}" ]]; then
+            if [[ "${EXISTING}" != "${GITHUB_SHA}" ]]; then
+              echo "Existing ${TAG} resolves to ${EXISTING}, not ${GITHUB_SHA}" >&2
+              exit 1
+            fi
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "${TAG} already resolves to the validated release commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${TAG}" "${GITHUB_SHA}" -m "VertiMosaic ${TAG}"
+            git push origin "refs/tags/${TAG}"
+            echo "created=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Dispatch Trusted Publishing workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A tag pushed with GITHUB_TOKEN does not fan out to other workflows.
+          # Dispatch publication explicitly; publication then creates the GitHub
+          # Release and dispatches release-evidence only after PyPI succeeds.
+          gh workflow run publish-pypi.yml --ref "${TAG}"

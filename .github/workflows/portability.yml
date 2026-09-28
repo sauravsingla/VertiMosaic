@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Portability
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            python: "3.12"
+          - os: macos-latest
+            python: "3.12"
+          - os: ubuntu-24.04-arm
+            python: "3.12"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install ".[dev]"
+      - run: vertimosaic --help
+      - run: vertimosaic demo --rows 400 --seed 42
+      - run: python -m pytest -q tests/test_demo.py tests/test_formal_benchmark.py tests/test_privacy_backends.py
+        if: runner.os != 'Windows'

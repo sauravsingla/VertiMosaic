@@ -16,7 +16,21 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: pip install -e ".[dev]"
       - run: bandit -r src -q
-      - run: pip-audit
+      - name: Audit installed dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if pip-audit; then
+              exit 0
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "pip-audit failed after ${attempt} attempts." >&2
+              exit 1
+            fi
+            echo "pip-audit attempt ${attempt} failed; retrying transient service/network errors." >&2
+            sleep $((attempt * 5))
+          done
       - name: Build SBOM
         run: cyclonedx-py environment --output-file sbom.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

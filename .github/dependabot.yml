@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      python-runtime:
+        patterns:
+          - "numpy"
+          - "pandas"
+          - "scipy"
+          - "scikit-learn"
+          - "pyarrow"
+      python-tooling:
+        dependency-type: development
+        patterns:
+          - "*"
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5

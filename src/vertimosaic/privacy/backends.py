@@ -9,13 +9,7 @@ import numpy as np
 
 @dataclass
 class GaussianZCDPAccountant:
-    """Account repeated Gaussian-mechanism releases using zCDP composition.
-
-    The accounting is formal for Gaussian releases whose L2 sensitivity is bounded
-    by the caller-supplied value. It does not establish end-to-end DP for a VFL
-    training protocol unless every sensitive release satisfies the stated bound
-    and is routed through the mechanism.
-    """
+    """Account repeated Gaussian-mechanism releases using zCDP composition."""
 
     noise_multiplier: float
     releases: int = 0
@@ -57,16 +51,11 @@ class GaussianZCDPAccountant:
 
 @dataclass
 class GaussianDPBackend:
-    """Optional Gaussian release mechanism for sensitivity-bounded research messages.
+    """Gaussian release with a caller-enforced L2-sensitivity contract.
 
-    ``l2_sensitivity`` is a protocol contract, not something this class can infer.
-    The caller must prove or enforce that neighboring inputs change the released
-    vector by at most this amount. Noise is sampled with standard deviation
-    ``noise_multiplier * l2_sensitivity``.
-
-    This backend is intentionally decoupled from default VertiMosaic training so
-    enabling it is an explicit research choice and cannot silently upgrade privacy
-    claims for existing experiments.
+    This legacy research backend is retained for experiments where sensitivity is
+    established by protocol-specific reasoning outside this class. Prefer
+    :class:`ClippedGaussianDPBackend` when the release can be bounded by clipping.
     """
 
     l2_sensitivity: float
@@ -98,18 +87,102 @@ class GaussianDPBackend:
         report["l2_sensitivity"] = float(self.l2_sensitivity)
         report["noise_std"] = self.noise_std
         report["scope"] = (
-            "release-level accounting only; end-to-end VFL DP requires every sensitive "
-            "message to satisfy the declared sensitivity bound"
+            "release-level accounting only; caller must establish the sensitivity bound; "
+            "end-to-end VFL DP requires every sensitive release to be covered"
+        )
+        return report
+
+
+@dataclass
+class ClippedGaussianDPBackend:
+    """Sensitivity-enforcing Gaussian release for one bounded vector message.
+
+    The input vector is clipped to ``clip_l2_norm`` before noise is added. Under
+    ``replace_one`` message adjacency, two clipped vectors can differ by at most
+    ``2 * clip_l2_norm`` in L2 norm. Under ``add_remove`` adjacency the bound is
+    ``clip_l2_norm``. This makes the sensitivity contract executable instead of
+    caller-supplied, while remaining a *message-level* mechanism. It does not turn
+    a complete VFL protocol into end-to-end differential privacy unless all
+    sensitive releases and the relevant neighboring-dataset relation are covered.
+    """
+
+    clip_l2_norm: float
+    noise_multiplier: float
+    adjacency: str = "replace_one"
+    seed: int = 42
+    accountant: GaussianZCDPAccountant = field(init=False)
+    _rng: np.random.Generator = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if not np.isfinite(self.clip_l2_norm) or self.clip_l2_norm <= 0:
+            raise ValueError("clip_l2_norm must be finite and positive")
+        if self.adjacency not in {"replace_one", "add_remove"}:
+            raise ValueError("adjacency must be replace_one or add_remove")
+        self.accountant = GaussianZCDPAccountant(self.noise_multiplier)
+        self._rng = np.random.default_rng(self.seed)
+
+    @property
+    def l2_sensitivity(self) -> float:
+        factor = 2.0 if self.adjacency == "replace_one" else 1.0
+        return float(factor * self.clip_l2_norm)
+
+    @property
+    def noise_std(self) -> float:
+        return float(self.noise_multiplier * self.l2_sensitivity)
+
+    def clip(self, value: np.ndarray) -> tuple[np.ndarray, float]:
+        array = np.asarray(value, dtype=float)
+        if not np.isfinite(array).all():
+            raise ValueError("DP release values must be finite")
+        norm = float(np.linalg.norm(array.reshape(-1), ord=2))
+        if norm <= self.clip_l2_norm or norm == 0.0:
+            return array.copy(), norm
+        return array * (self.clip_l2_norm / norm), norm
+
+    def release(self, value: np.ndarray) -> np.ndarray:
+        clipped, _ = self.clip(value)
+        noise = self._rng.normal(0.0, self.noise_std, size=clipped.shape)
+        self.accountant.step()
+        return clipped + noise
+
+    def privacy_report(self, *, delta: float) -> dict[str, float | int | str]:
+        report = self.accountant.summary(delta=delta)
+        report.update(
+            {
+                "clip_l2_norm": float(self.clip_l2_norm),
+                "adjacency": self.adjacency,
+                "l2_sensitivity": self.l2_sensitivity,
+                "noise_std": self.noise_std,
+                "sensitivity_enforcement": "L2 clipping before every release",
+                "scope": (
+                    "message-level clipped Gaussian mechanism; end-to-end VFL DP requires "
+                    "all sensitive protocol releases and the dataset adjacency to be covered"
+                ),
+            }
         )
         return report
 
 
 @dataclass(frozen=True)
 class PrivacyBackendRegistry:
-    """Discoverability metadata for optional privacy research backends."""
+    """Discoverability metadata for privacy research backends and their scope."""
 
-    available: tuple[str, ...] = ("gaussian-zcdp",)
-    planned: tuple[str, ...] = ("psi", "secure-aggregation", "mpc", "homomorphic-encryption")
+    available: tuple[str, ...] = (
+        "gaussian-zcdp",
+        "bounded-gaussian-zcdp",
+        "pairwise-mask-secagg",
+        "additive-secret-sharing-sum",
+    )
+    optional: tuple[str, ...] = ("openmined-psi", "paillier-homomorphic-sum")
+    planned: tuple[str, ...] = (
+        "dropout-resilient-secagg",
+        "general-purpose-mpc",
+        "he-vfl-training",
+    )
 
     def describe(self) -> dict[str, tuple[str, ...]]:
-        return {"available": self.available, "planned": self.planned}
+        return {
+            "available": self.available,
+            "optional": self.optional,
+            "planned": self.planned,
+        }

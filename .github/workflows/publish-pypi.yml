@@ -8,7 +8,9 @@ on:
 
 permissions:
   contents: write
+  actions: write
   id-token: write
+  attestations: write
 
 concurrency:
   group: pypi-${{ github.ref }}
@@ -16,7 +18,7 @@ concurrency:
 
 jobs:
   publish:
-    name: Build, publish, and release
+    name: Build, attest, publish, and release
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -50,8 +52,8 @@ jobs:
           PY
           )
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "v${VERSION}" ]]; then
-            echo "Tag ${GITHUB_REF_NAME} does not match package version v${VERSION}" >&2
+          if [[ "${GITHUB_REF_TYPE}" != "tag" || "${GITHUB_REF_NAME}" != "v${VERSION}" ]]; then
+            echo "Publishing requires tag v${VERSION}; got ${GITHUB_REF}" >&2
             exit 1
           fi
 
@@ -60,6 +62,11 @@ jobs:
 
       - name: Validate distributions
         run: python -m twine check dist/*
+
+      - name: Generate Sigstore-backed GitHub provenance attestations
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: 'dist/*'
 
       - name: Publish to PyPI with Trusted Publishing
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
@@ -73,12 +80,12 @@ jobs:
           VERSION: ${{ steps.package.outputs.version }}
         shell: bash
         run: |
+          set -euo pipefail
           TAG="v${VERSION}"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "GitHub release $TAG already exists."
-            exit 0
-          fi
-          cat > /tmp/release-notes.md <<EOF
+          else
+            cat > /tmp/release-notes.md <<EOF
           ## VertiMosaic ${TAG}
 
           PyPI release of VertiMosaic, a CPU-first vertical federated learning research framework for heterogeneous tabular data.
@@ -87,10 +94,21 @@ jobs:
           - Hugging Face Dataset: https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark
           - Hugging Face Space: https://huggingface.co/spaces/sauravsingla08/VertiMosaic
           - Source: https://github.com/sauravsingla/VertiMosaic
+          - Build provenance: GitHub artifact attestation for wheel and source distribution
 
           The GitHub release is created after successful PyPI publication so a connected Zenodo repository can archive the released source version.
           EOF
-          gh release create "$TAG" \
-            --target "$GITHUB_SHA" \
-            --title "VertiMosaic ${TAG}" \
-            --notes-file /tmp/release-notes.md
+            gh release create "$TAG" \
+              --target "$GITHUB_SHA" \
+              --title "VertiMosaic ${TAG}" \
+              --notes-file /tmp/release-notes.md
+          fi
+
+      - name: Dispatch immutable release evidence after publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run release-evidence.yml --ref "${TAG}"

@@ -30,6 +30,18 @@ jobs:
       - name: Empirical privacy audit smoke
         if: matrix.python-version == '3.12'
         run: python scripts/run_privacy_audit.py --rows 240 --seed 42 --output reports/privacy_audit.json
+      - name: Advanced protocol-message privacy audit
+        if: matrix.python-version == '3.12'
+        run: >-
+          vertimosaic-advanced-privacy-audit
+          --rows 400 --seed 42
+          --output reports/advanced_privacy_audit.json
+      - name: Separate-process remote transport benchmark
+        if: matrix.python-version == '3.12'
+        run: >-
+          vertimosaic-remote-benchmark
+          --messages 5 --vector-size 512 --seed 42
+          --output benchmarks/remote_transport.json
       - name: Multi-factor privacy research smoke
         if: matrix.python-version == '3.12'
         run: >-
