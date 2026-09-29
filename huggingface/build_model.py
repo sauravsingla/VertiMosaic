@@ -87,8 +87,7 @@ def _logistic_payload(model: VFLLogisticRegression) -> dict[str, Any]:
         "state": {
             "intercept": float(model.intercept_),
             "weights": {
-                name: _float_list(weights)
-                for name, weights in sorted(model.weights_.items())
+                name: _float_list(weights) for name, weights in sorted(model.weights_.items())
             },
             "trained_party_names": list(model.trained_party_names_),
             "active_party_name": model.active_party_name_,
@@ -96,9 +95,7 @@ def _logistic_payload(model: VFLLogisticRegression) -> dict[str, Any]:
             "converged": bool(model.converged_),
             "best_iteration": model.best_iteration_,
             "loss_history": [float(value) for value in model.loss_history_],
-            "validation_loss_history": [
-                float(value) for value in model.validation_loss_history_
-            ],
+            "validation_loss_history": [float(value) for value in model.validation_loss_history_],
         },
     }
 
@@ -127,12 +124,8 @@ def _gbdt_payload(model: VFLHistGBDT) -> dict[str, Any]:
             "party_names": list(model.party_names_),
             "tree_count": len(model.trees_),
             "best_iteration": model.best_iteration_,
-            "training_loss_history": [
-                float(value) for value in model.training_loss_history_
-            ],
-            "validation_loss_history": [
-                float(value) for value in model.validation_loss_history_
-            ],
+            "training_loss_history": [float(value) for value in model.training_loss_history_],
+            "validation_loss_history": [float(value) for value in model.validation_loss_history_],
             "trees": [_tree_payload(tree) for tree in model.trees_],
         },
     }
@@ -149,8 +142,7 @@ def _party_routing_payload(party: PassiveParty, max_bins: int) -> dict[str, Any]
         "n_features": int(party.n_features),
         "max_bins": int(max_bins),
         "thresholds": {
-            str(index): _float_list(thresholds[index])
-            for index in range(party.n_features)
+            str(index): _float_list(thresholds[index]) for index in range(party.n_features)
         },
         "boundary_note": (
             "This public synthetic checkpoint exposes train-derived thresholds for "
@@ -370,21 +362,16 @@ def build(output: Path) -> None:
         [validation_active, *validation_passive],
         [test_active, *test_passive],
     ):
-        for source_party, target_party in zip(
-            training_parties, evaluation_parties, strict=True
-        ):
+        for source_party, target_party in zip(training_parties, evaluation_parties, strict=True):
             source_party.share_histogram_routing_state_with(target_party)
 
     gbdt_payload = _gbdt_payload(gbdt)
     routing = {
-        party.name: _party_routing_payload(party, gbdt.max_bins)
-        for party in training_parties
+        party.name: _party_routing_payload(party, gbdt.max_bins) for party in training_parties
     }
     gbdt_validation = gbdt.predict_proba([validation_active, *validation_passive])[:, 1]
     gbdt_test = gbdt.predict_proba([test_active, *test_passive])[:, 1]
-    portable_gbdt = _portable_gbdt_probability(
-        gbdt_payload, routing, [test_active, *test_passive]
-    )
+    portable_gbdt = _portable_gbdt_probability(gbdt_payload, routing, [test_active, *test_passive])
     if not np.allclose(gbdt_test, portable_gbdt, rtol=0.0, atol=1e-12):
         raise RuntimeError("portable GBDT checkpoint failed prediction round-trip validation")
 
@@ -418,9 +405,7 @@ def build(output: Path) -> None:
             "validation_rows": int(len(split.validation)),
             "test_rows": int(len(split.test)),
             "party_order": [party.name for party in training_parties],
-            "features_per_party": {
-                party.name: int(party.n_features) for party in training_parties
-            },
+            "features_per_party": {party.name: int(party.n_features) for party in training_parties},
             "release_alignment": {
                 "logistic_max_iter": LOGISTIC_MAX_ITER,
                 "gbdt_estimators": GBDT_ESTIMATORS,
@@ -429,9 +414,7 @@ def build(output: Path) -> None:
         "checkpoint_files": {
             "logistic": "logistic/model.json",
             "gbdt": "gbdt/model.json",
-            "gbdt_party_routing": [
-                f"gbdt/parties/{party.name}.json" for party in training_parties
-            ],
+            "gbdt_party_routing": [f"gbdt/parties/{party.name}.json" for party in training_parties],
             "evaluation": "evaluation.json",
         },
         "round_trip_validation": {
@@ -449,9 +432,7 @@ def build(output: Path) -> None:
         _write_json(path, party_payload)
     _write_json(output / "evaluation.json", evaluation)
     _write_json(output / "metadata.json", metadata)
-    (output / "README.md").write_text(
-        _model_card(evaluation, source_commit), encoding="utf-8"
-    )
+    (output / "README.md").write_text(_model_card(evaluation, source_commit), encoding="utf-8")
 
     print(f"Wrote VertiMosaic Hugging Face model bundle to {output}")
     print(f"Source commit: {source_commit}")
@@ -466,9 +447,7 @@ def build(output: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Build VertiMosaic Hugging Face model bundle"
-    )
+    parser = argparse.ArgumentParser(description="Build VertiMosaic Hugging Face model bundle")
     parser.add_argument("--output", type=Path, default=Path("hf-model"))
     args = parser.parse_args()
     build(args.output)
