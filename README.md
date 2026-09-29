@@ -70,14 +70,12 @@ If the project is useful, the best support is simple: **run it, reproduce it, an
 
 ### Explore the live benchmark dashboard
 
-The **[VertiMosaic VFL Research Explorer](https://huggingface.co/spaces/sauravsingla08/VertiMosaic)** provides an interactive view of the maintained synthetic benchmark evidence, including model comparison, party contribution, entity overlap, party dropout, feature drift, and systems/provenance views.
+The **VertiMosaic VFL Research Explorer** provides an interactive view of the maintained synthetic benchmark evidence, including model comparison, party contribution, entity overlap, party dropout, feature drift, and systems/provenance views.
 
 It is generated from the repository benchmark pipeline rather than a hand-entered demo. The Space build configuration in this repository uses a **2,000-row core benchmark**, **1,200-row robustness studies**, **seed 42**, four synthetic party roles, and CPU reference execution. See [`huggingface/build_space.py`](huggingface/build_space.py) for the evidence-generation path.
 
 <p align="center">
-  <a href="https://huggingface.co/spaces/sauravsingla08/VertiMosaic">
-    <img src="assets/vertimosaic-hf-space.webp" alt="VertiMosaic Hugging Face VFL Research Explorer" width="100%">
-  </a>
+  <img src="assets/vertimosaic-hf-space.webp" alt="VertiMosaic Hugging Face VFL Research Explorer" width="100%">
 </p>
 
 <p align="center">
