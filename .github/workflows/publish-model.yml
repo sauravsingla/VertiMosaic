@@ -1,0 +1,144 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Publish VertiMosaic Model to Hugging Face
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: vertimosaic-huggingface-model
+  cancel-in-progress: true
+
+jobs:
+  publish-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install VertiMosaic
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Build Hugging Face model bundle
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          rm -rf hf-model
+          python huggingface/build_model.py --output hf-model
+          find hf-model -maxdepth 4 -type f -print | sort
+
+      - name: Validate model bundle and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("hf-model")
+          required = [
+              root / "README.md",
+              root / "metadata.json",
+              root / "evaluation.json",
+              root / "logistic" / "model.json",
+              root / "gbdt" / "model.json",
+              root / "gbdt" / "parties" / "bank.json",
+              root / "gbdt" / "parties" / "telecom.json",
+              root / "gbdt" / "parties" / "insurance.json",
+              root / "gbdt" / "parties" / "retail.json",
+          ]
+          missing = [str(path) for path in required if not path.is_file()]
+          if missing:
+              raise SystemExit(f"missing Hugging Face model artifacts: {missing}")
+
+          metadata = json.loads((root / "metadata.json").read_text(encoding="utf-8"))
+          if metadata.get("source_commit") != "${{ github.sha }}":
+              raise SystemExit("model bundle was not generated from the publishing GitHub SHA")
+          benchmark = metadata.get("benchmark", {})
+          if benchmark.get("rows") != 800 or benchmark.get("seed") != 42:
+              raise SystemExit("formal benchmark rows/seed mismatch")
+          if (
+              benchmark.get("train_rows") != 560
+              or benchmark.get("validation_rows") != 120
+              or benchmark.get("test_rows") != 120
+          ):
+              raise SystemExit("unexpected entity-level split sizes")
+          release_alignment = benchmark.get("release_alignment", {})
+          if release_alignment.get("logistic_max_iter") != 150:
+              raise SystemExit("logistic release configuration mismatch")
+          if release_alignment.get("gbdt_estimators") != 8:
+              raise SystemExit("GBDT release configuration mismatch")
+
+          round_trip = metadata.get("round_trip_validation", {})
+          if round_trip.get("logistic_predictions_match") is not True:
+              raise SystemExit("logistic round-trip validation did not pass")
+          if round_trip.get("gbdt_predictions_match") is not True:
+              raise SystemExit("GBDT round-trip validation did not pass")
+
+          logistic = json.loads(
+              (root / "logistic" / "model.json").read_text(encoding="utf-8")
+          )
+          if logistic.get("format") != "vertimosaic-vfl-logistic-checkpoint-v1":
+              raise SystemExit("unexpected logistic checkpoint format")
+          if logistic.get("hyperparameters", {}).get("max_iter") != 150:
+              raise SystemExit("unexpected logistic max_iter")
+
+          gbdt = json.loads((root / "gbdt" / "model.json").read_text(encoding="utf-8"))
+          if gbdt.get("format") != "vertimosaic-vfl-hist-gbdt-checkpoint-v1":
+              raise SystemExit("unexpected GBDT checkpoint format")
+          if gbdt.get("hyperparameters", {}).get("n_estimators") != 8:
+              raise SystemExit("unexpected GBDT estimator count")
+          if not gbdt.get("state", {}).get("trees"):
+              raise SystemExit("GBDT checkpoint has no fitted trees")
+
+          evaluation = json.loads((root / "evaluation.json").read_text(encoding="utf-8"))
+          if {row.get("model") for row in evaluation} != {"vfl_logistic", "vfl_hist_gbdt"}:
+              raise SystemExit("evaluation does not cover both reference checkpoints")
+          for row in evaluation:
+              metrics = row.get("test_metrics", {})
+              for name in ("roc_auc", "pr_auc", "f1", "brier"):
+                  value = metrics.get(name)
+                  if not isinstance(value, (int, float)):
+                      raise SystemExit(f"missing numeric {name} for {row.get('model')}")
+
+          card = (root / "README.md").read_text(encoding="utf-8")
+          required_card_fragments = [
+              "library_name: vertimosaic",
+              "VertiMosaic VFL Reference Models",
+              "800 aligned entities",
+              "separate party shards",
+              "not production models",
+              "https://github.com/sauravsingla/VertiMosaic",
+              "https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark",
+          ]
+          missing_card = [fragment for fragment in required_card_fragments if fragment not in card]
+          if missing_card:
+              raise SystemExit(f"model card contract missing: {missing_card}")
+
+          print("Validated VertiMosaic Hugging Face model bundle and provenance")
+          PY
+
+      - name: Install Hugging Face CLI
+        run: |
+          curl -LsSf https://hf.co/cli/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Publish model to Hugging Face
+        env:
+          HF_OIDC_RESOURCE: sauravsingla08/VertiMosaic-VFL-Reference-Models
+        run: |
+          hf upload sauravsingla08/VertiMosaic-VFL-Reference-Models hf-model . \
+            --commit-message "Sync VertiMosaic VFL reference models from GitHub ${GITHUB_SHA::7}"
