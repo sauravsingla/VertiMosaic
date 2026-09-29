@@ -75,7 +75,7 @@ The **VertiMosaic VFL Research Explorer** provides an interactive view of the ma
 It is generated from the repository benchmark pipeline rather than a hand-entered demo. The Space build configuration in this repository uses a **2,000-row core benchmark**, **1,200-row robustness studies**, **seed 42**, four synthetic party roles, and CPU reference execution. See [`huggingface/build_space.py`](huggingface/build_space.py) for the evidence-generation path.
 
 <p align="center">
-  <img src="assets/vertimosaic-hf-space.webp" alt="VertiMosaic Hugging Face VFL Research Explorer" width="100%">
+  <img src="https://raw.githubusercontent.com/sauravsingla/VertiMosaic/main/assets/vertimosaic-hf-space.webp" alt="VertiMosaic Hugging Face VFL Research Explorer" width="100%">
 </p>
 
 <p align="center">
