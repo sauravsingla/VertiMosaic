@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">VertiMosaic VFL Research Explorer preview</title>
+  <desc id="desc">Static preview of the VertiMosaic Hugging Face benchmark explorer showing model comparison, party contribution, entity overlap, party dropout, feature drift, and systems provenance views.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="1" stop-color="#111b31"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6b8fff"/>
+      <stop offset="1" stop-color="#52d6c6"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="18" flood-color="#000" flood-opacity="0.24"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="620" rx="26" fill="url(#bg)"/>
+  <rect x="30" y="28" width="1140" height="564" rx="22" fill="#121a2d" stroke="#2b3b61" stroke-width="2" filter="url(#shadow)"/>
+
+  <text x="64" y="72" fill="#9db4ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" letter-spacing="2">VERTICAL FEDERATED LEARNING · REPRODUCIBLE EVIDENCE</text>
+  <text x="64" y="117" fill="#edf2ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="34" font-weight="800">VertiMosaic VFL Research Explorer</text>
+  <text x="64" y="150" fill="#9fb0cf" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17">Interactive benchmark evidence generated from the repository pipeline</text>
+
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">
+    <rect x="64" y="178" width="126" height="34" rx="17" fill="#0d1629" stroke="#6b8fff"/><text x="83" y="200" fill="#9db4ff">2,000 core rows</text>
+    <rect x="202" y="178" width="164" height="34" rx="17" fill="#0d1629" stroke="#52d6c6"/><text x="220" y="200" fill="#73e1d3">1,200 robustness rows</text>
+    <rect x="378" y="178" width="82" height="34" rx="17" fill="#0d1629" stroke="#6b8fff"/><text x="399" y="200" fill="#9db4ff">seed 42</text>
+    <rect x="472" y="178" width="74" height="34" rx="17" fill="#0d1629" stroke="#52d273"/><text x="494" y="200" fill="#7ce49a">CPU</text>
+  </g>
+
+  <rect x="64" y="242" width="230" height="304" rx="18" fill="#0d1528" stroke="#273756"/>
+  <text x="88" y="277" fill="#edf2ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="800">Explorer views</text>
+
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">
+    <rect x="82" y="298" width="194" height="38" rx="10" fill="#1b2a4b"/><circle cx="101" cy="317" r="5" fill="#7ea1ff"/><text x="116" y="322" fill="#edf2ff">Model comparison</text>
+    <circle cx="101" cy="359" r="5" fill="#52d6c6"/><text x="116" y="364" fill="#c9d5ef">Party contribution</text>
+    <circle cx="101" cy="401" r="5" fill="#9e78ff"/><text x="116" y="406" fill="#c9d5ef">Entity overlap</text>
+    <circle cx="101" cy="443" r="5" fill="#ffb84d"/><text x="116" y="448" fill="#c9d5ef">Party dropout</text>
+    <circle cx="101" cy="485" r="5" fill="#ff7f8a"/><text x="116" y="490" fill="#c9d5ef">Feature drift</text>
+    <circle cx="101" cy="527" r="5" fill="#7ea1ff"/><text x="116" y="532" fill="#c9d5ef">Systems &amp; provenance</text>
+  </g>
+
+  <g>
+    <rect x="318" y="242" width="390" height="142" rx="18" fill="#18223a" stroke="#2b3b61"/>
+    <text x="344" y="275" fill="#edf2ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="800">Model comparison</text>
+    <text x="344" y="302" fill="#9fb0cf" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Federated and non-federated reference paths</text>
+    <rect x="344" y="328" width="112" height="18" rx="9" fill="#6b8fff"/>
+    <rect x="466" y="328" width="86" height="18" rx="9" fill="#52d6c6"/>
+    <rect x="562" y="328" width="118" height="18" rx="9" fill="#9e78ff"/>
+    <text x="344" y="367" fill="#7f91b3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Predictive metrics · communication · timing · memory</text>
+
+    <rect x="728" y="242" width="408" height="142" rx="18" fill="#18223a" stroke="#2b3b61"/>
+    <text x="754" y="275" fill="#edf2ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="800">Robustness studies</text>
+    <text x="754" y="302" fill="#9fb0cf" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Overlap, dropout, drift and party contribution</text>
+    <polyline points="754,350 808,330 861,340 914,312 968,324 1021,303 1090,317" fill="none" stroke="url(#accent)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="754" y1="356" x2="1090" y2="356" stroke="#2b3b61"/>
+
+    <rect x="318" y="404" width="390" height="142" rx="18" fill="#18223a" stroke="#2b3b61"/>
+    <text x="344" y="437" fill="#edf2ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="800">Four synthetic party roles</text>
+    <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="700">
+      <rect x="344" y="462" width="72" height="31" rx="10" fill="#0d1629" stroke="#6b8fff"/><text x="360" y="482" fill="#9db4ff">Bank</text>
+      <rect x="426" y="462" width="89" height="31" rx="10" fill="#0d1629" stroke="#52d6c6"/><text x="442" y="482" fill="#73e1d3">Telecom</text>
+      <rect x="525" y="462" width="93" height="31" rx="10" fill="#0d1629" stroke="#9e78ff"/><text x="541" y="482" fill="#bca3ff">Insurance</text>
+      <rect x="628" y="462" width="58" height="31" rx="10" fill="#0d1629" stroke="#ffb84d"/><text x="640" y="482" fill="#ffd18a">Retail</text>
+    </g>
+    <text x="344" y="522" fill="#9fb0cf" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13">Aligned entities · heterogeneous features · party-local raw tables</text>
+
+    <rect x="728" y="404" width="408" height="142" rx="18" fill="#10192c" stroke="#2b3b61"/>
+    <text x="754" y="437" fill="#edf2ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="800">Evidence &amp; privacy boundary</text>
+    <text x="754" y="470" fill="#9fb0cf" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Generated from code · provenance captured · CPU reference</text>
+    <text x="754" y="500" fill="#ffd27a" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">Raw-feature locality ≠ cryptographic privacy</text>
+    <text x="754" y="526" fill="#7f91b3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Research evidence, not a blanket secure-VFL guarantee</text>
+  </g>
+
+  <rect x="64" y="565" width="1072" height="1" fill="#263655"/>
+  <text x="64" y="585" fill="#7f91b3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12">Static README preview · live interactive explorer available via the link below</text>
+</svg>
