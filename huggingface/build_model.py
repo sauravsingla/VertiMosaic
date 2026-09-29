@@ -16,7 +16,7 @@ from vertimosaic.evaluation import binary_metrics, entity_level_split, select_f1
 from vertimosaic.experiments.pipeline import slice_parties
 from vertimosaic.models import VFLHistGBDT, VFLLogisticRegression
 from vertimosaic.models.vfl_hist_gbdt import TreeNode
-from vertimosaic.parties import ActiveParty, PassiveParty
+from vertimosaic.parties import PassiveParty
 
 ROWS = 800
 SEED = 42
@@ -24,13 +24,14 @@ LOGISTIC_MAX_ITER = 150
 GBDT_ESTIMATORS = 8
 
 
-def _json_dump(path: Path, payload: Any) -> None:
+def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def _float_list(values: np.ndarray | list[float]) -> list[float]:
-    return [float(value) for value in np.asarray(values, dtype=float).reshape(-1)]
+    array = np.asarray(values, dtype=float).reshape(-1)
+    return [float(value) for value in array]
 
 
 def _prediction_digest(values: np.ndarray) -> str:
@@ -47,8 +48,10 @@ def _tree_payload(node: TreeNode) -> dict[str, Any]:
     }
     if node.is_leaf:
         return payload
-    if node.party is None or node.split_ref is None or node.left is None or node.right is None:
-        raise RuntimeError("fitted GBDT tree contains incomplete non-leaf state")
+    if node.party is None or node.split_ref is None:
+        raise RuntimeError("fitted GBDT tree contains incomplete split state")
+    if node.left is None or node.right is None:
+        raise RuntimeError("fitted GBDT tree contains incomplete child state")
     payload.update(
         {
             "party": node.party,
@@ -84,7 +87,8 @@ def _logistic_payload(model: VFLLogisticRegression) -> dict[str, Any]:
         "state": {
             "intercept": float(model.intercept_),
             "weights": {
-                name: _float_list(weights) for name, weights in sorted(model.weights_.items())
+                name: _float_list(weights)
+                for name, weights in sorted(model.weights_.items())
             },
             "trained_party_names": list(model.trained_party_names_),
             "active_party_name": model.active_party_name_,
@@ -145,7 +149,8 @@ def _party_routing_payload(party: PassiveParty, max_bins: int) -> dict[str, Any]
         "n_features": int(party.n_features),
         "max_bins": int(max_bins),
         "thresholds": {
-            str(index): _float_list(thresholds[index]) for index in range(party.n_features)
+            str(index): _float_list(thresholds[index])
+            for index in range(party.n_features)
         },
         "boundary_note": (
             "This public synthetic checkpoint exposes train-derived thresholds for "
@@ -191,7 +196,8 @@ def _portable_gbdt_probability(
             party_name = str(node["party"])
             feature_ref = int(node["split_ref"]["feature_ref"])
             bin_ref = int(node["split_ref"]["bin_ref"])
-            threshold = float(routing[party_name]["thresholds"][str(feature_ref)][bin_ref])
+            party_thresholds = routing[party_name]["thresholds"]
+            threshold = float(party_thresholds[str(feature_ref)][bin_ref])
             values = by_name[party_name]._x[indices, feature_ref]
             left = indices[values <= threshold]
             right = indices[values > threshold]
@@ -202,9 +208,9 @@ def _portable_gbdt_probability(
         return output
 
     raw = np.full(n_rows, float(state["base_score"]), dtype=float)
-    rate = float(payload["hyperparameters"]["learning_rate"])
+    learning_rate = float(payload["hyperparameters"]["learning_rate"])
     for tree in state["trees"]:
-        raw += rate * tree_prediction(tree)
+        raw += learning_rate * tree_prediction(tree)
     return _sigmoid(raw)
 
 
@@ -226,10 +232,18 @@ def _evaluation_record(
     }
 
 
+def _metric_row(label: str, record: dict[str, Any]) -> str:
+    metrics = record["test_metrics"]
+    return (
+        f"| {label} | {metrics['roc_auc']:.4f} | {metrics['pr_auc']:.4f} | "
+        f"{metrics['f1']:.4f} | {metrics['brier']:.4f} |"
+    )
+
+
 def _model_card(evaluation: list[dict[str, Any]], source_commit: str) -> str:
     by_name = {record["model"]: record for record in evaluation}
-    logistic = by_name["vfl_logistic"]
-    gbdt = by_name["vfl_hist_gbdt"]
+    logistic_row = _metric_row("VFL Logistic", by_name["vfl_logistic"])
+    gbdt_row = _metric_row("VFL HistGBDT", by_name["vfl_hist_gbdt"])
     return f"""---
 license: apache-2.0
 library_name: vertimosaic
@@ -274,8 +288,8 @@ entity-level train/validation/test split, logistic `max_iter=150`, and GBDT
 
 | Checkpoint | ROC-AUC | PR-AUC | F1 | Brier |
 |---|---:|---:|---:|---:|
-| VFL Logistic | {logistic['test_metrics']['roc_auc']:.4f} | {logistic['test_metrics']['pr_auc']:.4f} | {logistic['test_metrics']['f1']:.4f} | {logistic['test_metrics']['brier']:.4f} |
-| VFL HistGBDT | {gbdt['test_metrics']['roc_auc']:.4f} | {gbdt['test_metrics']['pr_auc']:.4f} | {gbdt['test_metrics']['f1']:.4f} | {gbdt['test_metrics']['brier']:.4f} |
+{logistic_row}
+{gbdt_row}
 
 These are single deterministic synthetic benchmark measurements, not a leaderboard and not
 evidence that VFL generally outperforms centralized learning.
@@ -356,12 +370,15 @@ def build(output: Path) -> None:
         [validation_active, *validation_passive],
         [test_active, *test_passive],
     ):
-        for source_party, target_party in zip(training_parties, evaluation_parties, strict=True):
+        for source_party, target_party in zip(
+            training_parties, evaluation_parties, strict=True
+        ):
             source_party.share_histogram_routing_state_with(target_party)
 
     gbdt_payload = _gbdt_payload(gbdt)
     routing = {
-        party.name: _party_routing_payload(party, gbdt.max_bins) for party in training_parties
+        party.name: _party_routing_payload(party, gbdt.max_bins)
+        for party in training_parties
     }
     gbdt_validation = gbdt.predict_proba([validation_active, *validation_passive])[:, 1]
     gbdt_test = gbdt.predict_proba([test_active, *test_passive])[:, 1]
@@ -425,19 +442,21 @@ def build(output: Path) -> None:
     }
 
     output.mkdir(parents=True, exist_ok=True)
-    _json_dump(output / "logistic" / "model.json", logistic_payload)
-    _json_dump(output / "gbdt" / "model.json", gbdt_payload)
+    _write_json(output / "logistic" / "model.json", logistic_payload)
+    _write_json(output / "gbdt" / "model.json", gbdt_payload)
     for party_name, party_payload in routing.items():
-        _json_dump(output / "gbdt" / "parties" / f"{party_name}.json", party_payload)
-    _json_dump(output / "evaluation.json", evaluation)
-    _json_dump(output / "metadata.json", metadata)
+        path = output / "gbdt" / "parties" / f"{party_name}.json"
+        _write_json(path, party_payload)
+    _write_json(output / "evaluation.json", evaluation)
+    _write_json(output / "metadata.json", metadata)
     (output / "README.md").write_text(
         _model_card(evaluation, source_commit), encoding="utf-8"
     )
 
     print(f"Wrote VertiMosaic Hugging Face model bundle to {output}")
     print(f"Source commit: {source_commit}")
-    print(f"Train/validation/test rows: {len(split.train)}/{len(split.validation)}/{len(split.test)}")
+    split_summary = f"{len(split.train)}/{len(split.validation)}/{len(split.test)}"
+    print(f"Train/validation/test rows: {split_summary}")
     for record in evaluation:
         metrics = record["test_metrics"]
         print(
@@ -447,7 +466,9 @@ def build(output: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build VertiMosaic Hugging Face model bundle")
+    parser = argparse.ArgumentParser(
+        description="Build VertiMosaic Hugging Face model bundle"
+    )
     parser.add_argument("--output", type=Path, default=Path("hf-model"))
     args = parser.parse_args()
     build(args.output)
