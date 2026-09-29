@@ -3,10 +3,6 @@ name: Publish VertiMosaic Model to Hugging Face
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/publish-model.yml'
 
 permissions:
   id-token: write
