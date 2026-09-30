@@ -2,12 +2,12 @@
 title: VertiMosaic — Interactive VFL Evidence Explorer
 emoji: 🧩
 colorFrom: indigo
-colorTo: teal
+colorTo: blue
 sdk: static
 app_file: index.html
 pinned: true
 license: apache-2.0
-short_description: Explore VFL quality, robustness, systems metrics and provenance interactively
+short_description: Interactive VFL benchmark, robustness & provenance explorer
 ---
 
 # VertiMosaic — Interactive VFL Evidence Explorer
