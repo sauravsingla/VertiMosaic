@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
+# ruff: noqa: E501
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
 from typing import Any
-
 
 DATASET_ID = "sauravsingla08/VertiMosaic-VFL-Benchmark"
 MODEL_ID = "sauravsingla08/VertiMosaic-VFL-Reference-Models"
@@ -294,10 +294,7 @@ def main() -> None:
 
     args = parser.parse_args()
     root: Path = args.root
-    if args.kind == "dataset":
-        card = _dataset_card(root)
-    else:
-        card = _model_card(root)
+    card = _dataset_card(root) if args.kind == "dataset" else _model_card(root)
     (root / "README.md").write_text(card, encoding="utf-8")
 
 
