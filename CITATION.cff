@@ -1,8 +1,10 @@
 cff-version: 1.2.0
-message: "If you use VertiMosaic, please cite the software."
+message: "If you use VertiMosaic, please cite the archived software release."
 title: "VertiMosaic: CPU-Only Cross-Industry Vertical Federated Learning for Privacy-Constrained Tabular Machine Learning"
 type: software
 version: 0.3.0
+doi: 10.5281/zenodo.23021923
+url: "https://zenodo.org/records/23021923"
 license: Apache-2.0
 repository-code: "https://github.com/sauravsingla/VertiMosaic"
 authors:
