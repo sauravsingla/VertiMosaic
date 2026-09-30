@@ -1,5 +1,6 @@
 {
-  "title": "VertiMosaic",
+  "title": "VertiMosaic: CPU-Only Cross-Industry Vertical Federated Learning for Privacy-Constrained Tabular Machine Learning",
+  "version": "0.3.0",
   "upload_type": "software",
   "description": "A reproducible research framework for vertical federated learning on heterogeneous tabular data with explicit privacy boundaries, provenance and communication auditing.",
   "creators": [
