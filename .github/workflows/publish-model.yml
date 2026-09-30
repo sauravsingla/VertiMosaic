@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/publish-model.yml'
       - 'huggingface/build_model.py'
+      - 'huggingface/enrich_cards.py'
       - 'src/vertimosaic/datasets/synthetic.py'
       - 'src/vertimosaic/evaluation/**'
       - 'src/vertimosaic/experiments/pipeline.py'
@@ -49,6 +50,7 @@ jobs:
         run: |
           rm -rf hf-model
           python huggingface/build_model.py --output hf-model
+          python huggingface/enrich_cards.py model --root hf-model
           find hf-model -maxdepth 4 -type f -print | sort
 
       - name: Validate model bundle and provenance
