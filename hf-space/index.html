@@ -1,103 +1,100 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="Interactive VertiMosaic benchmark explorer for vertical federated learning model quality, robustness, systems measurements and provenance." />
+  <meta name="color-scheme" content="dark light" />
   <title>VertiMosaic — VFL Research Explorer</title>
-  <style>
-    :root{--bg:#08111f;--panel:#0f1b2e;--panel2:#13223a;--line:#243653;--text:#eef4ff;--muted:#9fb0c8;--accent:#7c8cff;--accent2:#58d4c8;--warn:#f0b86a;--good:#7fe1a5;--radius:18px}
-    *{box-sizing:border-box} body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at 15% 0,#14254a 0,transparent 31%),var(--bg);color:var(--text)}
-    a{color:inherit}.wrap{max-width:1240px;margin:0 auto;padding:28px 22px 64px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:30px}.brand{display:flex;gap:13px;align-items:center}.mark{width:46px;height:46px;border:1px solid #405582;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,#1d2f57,#10213c);font-size:23px}.brand b{font-size:18px}.brand small{display:block;color:var(--muted);margin-top:3px}.links{display:flex;gap:9px;flex-wrap:wrap}.btn{display:inline-flex;padding:9px 12px;border-radius:11px;border:1px solid var(--line);background:#101d31;color:var(--text);text-decoration:none;font-size:13px}.hero{padding:35px;border:1px solid var(--line);border-radius:26px;background:linear-gradient(135deg,rgba(36,58,104,.72),rgba(15,27,46,.92));box-shadow:0 18px 70px rgba(0,0,0,.2)}
-    .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent2);font-weight:700}.hero h1{font-size:clamp(34px,6vw,64px);line-height:1.02;margin:12px 0 16px;max-width:900px}.hero p{max-width:850px;color:#c7d3e6;font-size:17px;line-height:1.65;margin:0}.facts{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:25px}.fact{padding:16px;border-radius:15px;background:rgba(5,14,29,.48);border:1px solid #30456a}.fact strong{font-size:22px;display:block}.fact span{font-size:12px;color:var(--muted)}
-    .tabs{display:flex;gap:8px;overflow:auto;padding:24px 0 14px}.tab{white-space:nowrap;border:1px solid var(--line);background:#0d192a;color:#afbed4;padding:10px 14px;border-radius:12px;cursor:pointer}.tab.active{background:#1b2d4d;color:white;border-color:#536da2}.section{display:none}.section.active{display:block}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{background:rgba(15,27,46,.93);border:1px solid var(--line);border-radius:var(--radius);padding:20px}.card h2,.card h3{margin:0 0 8px}.sub{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:17px}.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.metric{padding:14px;border:1px solid #273b5d;border-radius:13px;background:#0b1626}.metric b{font-size:20px;display:block;margin-bottom:4px}.metric span{font-size:11px;color:var(--muted)}
-    .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0 18px}.controls label{font-size:12px;color:var(--muted)} select{background:#0a1626;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 10px}.chart{display:flex;flex-direction:column;gap:10px}.row{display:grid;grid-template-columns:minmax(150px,230px) 1fr 82px;gap:10px;align-items:center}.label{font-size:12px;color:#d7e1f0;overflow:hidden;text-overflow:ellipsis}.track{height:12px;background:#07101d;border-radius:999px;overflow:hidden;border:1px solid #1f304c}.fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:999px;transition:width .35s ease}.value{text-align:right;font-variant-numeric:tabular-nums;font-size:12px;color:#dfe7f4}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}table{border-collapse:collapse;width:100%;min-width:700px}th,td{padding:11px 12px;border-bottom:1px solid #20324e;font-size:12px;text-align:right}th:first-child,td:first-child{text-align:left}th{position:sticky;top:0;background:#13213a;color:#aebed5}tr:last-child td{border-bottom:0}.notice{border-left:3px solid var(--warn);background:#251d13;padding:14px 16px;border-radius:10px;color:#e8d5b8;font-size:13px;line-height:1.55}.privacy{border-left-color:var(--accent2);background:#102521;color:#c9eee8}.footer{margin-top:26px;color:#8295af;font-size:12px;text-align:center}.loading{padding:24px;border:1px dashed #3a4e70;border-radius:16px;color:var(--muted)}
-    @media(max-width:900px){.facts{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}.metric-grid{grid-template-columns:repeat(2,1fr)}.topbar{align-items:flex-start;flex-direction:column}.hero{padding:24px}.row{grid-template-columns:120px 1fr 70px}}
-  </style>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+<a class="skip" href="#explorer">Skip to explorer</a>
 <div class="wrap">
-  <div class="topbar">
-    <div class="brand"><div class="mark">🧩</div><div><b>VertiMosaic</b><small>VFL Research Explorer</small></div></div>
-    <div class="links"><a class="btn" href="https://github.com/sauravsingla/VertiMosaic" target="_blank">GitHub</a><a class="btn" href="https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark" target="_blank">Dataset</a></div>
-  </div>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="VertiMosaic home">
+      <div class="mark" aria-hidden="true">🧩</div>
+      <div><b>VertiMosaic</b><small>VFL Research Explorer</small></div>
+    </a>
+    <nav class="links" aria-label="Project links">
+      <a class="btn hide-sm" href="https://github.com/sauravsingla/VertiMosaic" target="_blank" rel="noreferrer">↗ GitHub</a>
+      <a class="btn hide-sm" href="https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark" target="_blank" rel="noreferrer">🤗 Dataset</a>
+      <a class="btn" href="data.json" download>↓ Evidence JSON</a>
+      <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle light and dark theme" title="Toggle theme">☼</button>
+    </nav>
+  </header>
 
-  <section class="hero">
-    <div class="eyebrow">Vertical Federated Learning · Reproducible Evidence</div>
-    <h1>Explore how VFL changes across parties, overlap, dropout and drift.</h1>
-    <p>This browser-only dashboard is generated from VertiMosaic's synthetic benchmark suite. It exposes predictive metrics, communication cost, timing, memory and robustness evidence while preserving the project's explicit privacy and data-provenance boundaries.</p>
-    <div class="facts">
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-grid">
+        <div>
+          <div class="eyebrow"><span class="pulse" aria-hidden="true"></span> Reproducible vertical federated learning evidence</div>
+          <h1 id="hero-title">See what changes when the data stays distributed.</h1>
+          <p>Explore VertiMosaic’s synthetic VFL benchmark across model quality, party contribution, entity overlap, party dropout, feature drift, communication, timing and memory — with provenance attached to every published run.</p>
+          <div class="hero-actions">
+            <a class="btn primary" href="#explorer">Explore the benchmark →</a>
+            <button class="btn" id="storyStart" type="button">Take a 60-second tour</button>
+          </div>
+          <div class="hero-note"><strong>Research boundary:</strong> raw-feature locality is demonstrated; cryptographic privacy is not implied.</div>
+        </div>
+        <div class="mosaic" aria-label="Benchmark dimensions">
+          <div class="tile"><span class="tile-icon">📈</span><b>Model quality</b><span>ROC-AUC, PR-AUC, F1 and calibration metrics.</span></div>
+          <div class="tile"><span class="tile-icon">🏢</span><b>Party contribution</b><span>Bank, Telecom, Insurance and Retail feature views.</span></div>
+          <div class="tile"><span class="tile-icon">🔗</span><b>Robustness</b><span>Partial overlap, availability and controlled drift.</span></div>
+          <div class="tile"><span class="tile-icon">🧪</span><b>Provenance</b><span>Seed, source commit and system measurements.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="facts" aria-label="Benchmark facts">
       <div class="fact"><strong id="fact-core">—</strong><span>core benchmark rows</span></div>
+      <div class="fact"><strong id="fact-seed">—</strong><span>fixed experiment seed</span></div>
       <div class="fact"><strong>4</strong><span>synthetic party roles</span></div>
-      <div class="fact"><strong>5</strong><span>benchmark families</span></div>
       <div class="fact"><strong>NO</strong><span>raw feature pooling</span></div>
       <div class="fact"><strong>CPU</strong><span>reference execution</span></div>
-    </div>
-  </section>
+    </section>
 
-  <div class="tabs" id="tabs">
-    <button class="tab active" data-tab="models">Model comparison</button>
-    <button class="tab" data-tab="parties">Party contribution</button>
-    <button class="tab" data-tab="overlap">Entity overlap</button>
-    <button class="tab" data-tab="dropout">Party dropout</button>
-    <button class="tab" data-tab="drift">Feature drift</button>
-    <button class="tab" data-tab="systems">Systems & provenance</button>
-  </div>
+    <section class="tour" aria-label="Suggested exploration paths">
+      <div class="tour-intro"><h2>What do you want to understand?</h2><p>Jump directly to the experiment family that answers your question.</p></div>
+      <button class="tour-card" type="button" data-go="models"><span class="tour-icon">⚖️</span><b>How do the reference models compare?</b><p>Switch metrics and inspect communication alongside predictive behavior.</p></button>
+      <button class="tour-card" type="button" data-go="overlap"><span class="tour-icon">🧷</span><b>What happens when entities do not fully overlap?</b><p>Compare intersection-only and availability-indicator strategies.</p></button>
+      <button class="tour-card" type="button" data-go="drift"><span class="tour-icon">🌊</span><b>How does controlled feature drift affect results?</b><p>Inspect mean, variance, missingness and category-frequency shifts.</p></button>
+    </section>
 
-  <div id="loading" class="loading">Loading benchmark evidence from <code>data.json</code>…</div>
+    <section id="explorer" aria-labelledby="explorer-title">
+      <div class="explorer-head">
+        <div><h2 id="explorer-title">Interactive evidence explorer</h2><p>Each view is generated from <code>data.json</code>; use the selectors to interrogate the run.</p></div>
+        <div class="fresh"><span class="dot" aria-hidden="true"></span><span id="freshness">Loading provenance…</span></div>
+      </div>
 
-  <section class="section active" id="models"></section>
-  <section class="section" id="parties"></section>
-  <section class="section" id="overlap"></section>
-  <section class="section" id="dropout"></section>
-  <section class="section" id="drift"></section>
-  <section class="section" id="systems"></section>
-  <div class="footer" id="footer"></div>
+      <div class="tabs-shell">
+        <div class="tabs" id="tabs" role="tablist" aria-label="Benchmark views">
+          <button class="tab active" role="tab" aria-selected="true" data-tab="models">📊 Model comparison</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="parties">🏢 Party contribution</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="overlap">🔗 Entity overlap</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="dropout">⚡ Party dropout</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="drift">🌊 Feature drift</button>
+          <button class="tab" role="tab" aria-selected="false" data-tab="systems">🧪 Systems & provenance</button>
+        </div>
+      </div>
+
+      <div id="loading" class="loading"><strong>Loading benchmark evidence…</strong><br />Reading the current <code>data.json</code> published by the VertiMosaic pipeline.</div>
+      <section class="section active" id="models" role="tabpanel"></section>
+      <section class="section" id="parties" role="tabpanel"></section>
+      <section class="section" id="overlap" role="tabpanel"></section>
+      <section class="section" id="dropout" role="tabpanel"></section>
+      <section class="section" id="drift" role="tabpanel"></section>
+      <section class="section" id="systems" role="tabpanel"></section>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span id="footerText">VertiMosaic benchmark explorer</span>
+    <span><a href="https://github.com/sauravsingla/VertiMosaic" target="_blank" rel="noreferrer">Source</a> · <a href="https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark" target="_blank" rel="noreferrer">Dataset</a></span>
+  </footer>
 </div>
-<script>
-const METRICS={roc_auc:'ROC-AUC',pr_auc:'PR-AUC',f1:'F1',log_loss:'Log loss',brier:'Brier score',ece:'ECE'};
-let DATA=null;
-const f=(v,d=4)=>v==null?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:d});
-const bytes=v=>v==null?'—':(v/1024).toLocaleString(undefined,{maximumFractionDigits:1})+' KiB';
-const esc=s=>String(s??'—').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-function chart(rows,labelKey,metric){
-  if(!rows?.length)return '<div class="sub">No evidence rows available.</div>';
-  const vals=rows.map(r=>Number(r[metric]??0)); const max=Math.max(...vals,1e-12);
-  return '<div class="chart">'+rows.map(r=>`<div class="row"><div class="label" title="${esc(r[labelKey])}">${esc(r[labelKey])}</div><div class="track"><div class="fill" style="width:${Math.max(2,100*Number(r[metric]??0)/max)}%"></div></div><div class="value">${f(r[metric])}</div></div>`).join('')+'</div>';
-}
-function metricOptions(){return Object.entries(METRICS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}
-function renderModels(){
-  const rows=DATA.core_model_comparison||[];
-  document.querySelector('#models').innerHTML=`<div class="grid"><div class="card"><h2>Core model comparison</h2><div class="sub">Same synthetic vertical population, fixed seed, separate VFL reference models.</div><div class="controls"><label>Metric <select id="modelMetric">${metricOptions()}</select></label></div><div id="modelChart"></div></div><div class="card"><h2>Model evidence</h2><div class="metric-grid">${rows.map(r=>`<div class="metric"><b>${f(r.roc_auc)}</b><span>${esc(r.model)} ROC-AUC</span></div><div class="metric"><b>${f(r.pr_auc)}</b><span>${esc(r.model)} PR-AUC</span></div><div class="metric"><b>${bytes(r.estimated_communication_bytes)}</b><span>${esc(r.model)} estimated communication</span></div>`).join('')}</div></div></div>`;
-  const upd=()=>document.querySelector('#modelChart').innerHTML=chart(rows,'model',document.querySelector('#modelMetric').value); document.querySelector('#modelMetric').onchange=upd;upd();
-}
-function renderParties(){
- const rows=DATA.party_ablation||[];
- document.querySelector('#parties').innerHTML=`<div class="grid"><div class="card"><h2>Party ablation</h2><div class="sub">Bank is active. Telecom, Insurance and Retail are added in valid passive-party subsets.</div><div class="controls"><label>Metric <select id="partyMetric">${metricOptions()}</select></label></div><div id="partyChart"></div></div><div class="card"><h2>Interpretation</h2><div class="notice privacy">These bars show measured predictive behavior for synthetic party-role combinations. They are descriptive benchmark evidence, not a claim that any real industry's data will provide the same utility.</div><div style="height:14px"></div><div class="table-wrap"><table><thead><tr><th>Parties</th><th>ROC-AUC</th><th>PR-AUC</th><th>F1</th><th>Comm.</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.parties)}</td><td>${f(r.roc_auc)}</td><td>${f(r.pr_auc)}</td><td>${f(r.f1)}</td><td>${bytes(r.estimated_communication_bytes)}</td></tr>`).join('')}</tbody></table></div></div></div>`;
- const upd=()=>document.querySelector('#partyChart').innerHTML=chart(rows,'parties',document.querySelector('#partyMetric').value);document.querySelector('#partyMetric').onchange=upd;upd();
-}
-function renderOverlap(){
- const rows=DATA.partial_overlap||[];
- document.querySelector('#overlap').innerHTML=`<div class="card"><h2>Partial entity overlap</h2><div class="sub">Compare intersection-only and availability-indicator approaches as common-entity coverage changes.</div><div class="controls"><label>Metric <select id="overlapMetric">${metricOptions()}</select></label><label>Method <select id="overlapMethod"><option value="all">Both methods</option><option value="intersection_only">Intersection only</option><option value="availability_indicator">Availability indicator</option></select></label></div><div id="overlapChart"></div><div style="height:18px"></div><div class="table-wrap"><table><thead><tr><th>Method / overlap</th><th>Coverage</th><th>Retained entities</th><th>ROC-AUC</th><th>PR-AUC</th><th>F1</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.method)} · ${f(100*r.overlap_fraction,0)}%</td><td>${f(100*r.coverage,1)}%</td><td>${f(r.retained_entities,0)}</td><td>${f(r.roc_auc)}</td><td>${f(r.pr_auc)}</td><td>${f(r.f1)}</td></tr>`).join('')}</tbody></table></div></div>`;
- const upd=()=>{const method=document.querySelector('#overlapMethod').value;const sub=method==='all'?rows:rows.filter(r=>r.method===method);const labeled=sub.map(r=>({...r,_label:`${r.method} · ${f(100*r.overlap_fraction,0)}%`}));document.querySelector('#overlapChart').innerHTML=chart(labeled,'_label',document.querySelector('#overlapMetric').value)};document.querySelector('#overlapMetric').onchange=upd;document.querySelector('#overlapMethod').onchange=upd;upd();
-}
-function renderDropout(){
- const rows=DATA.party_dropout||[];
- document.querySelector('#dropout').innerHTML=`<div class="card"><h2>Party availability and dropout</h2><div class="sub">Inspect the difference between inference-time dropout and training/inference availability scenarios.</div><div class="controls"><label>Metric <select id="dropMetric">${metricOptions()}</select></label><label>Phase <select id="dropPhase"><option value="inference_time_dropout">Inference-time dropout</option><option value="training_and_inference_availability">Training + inference availability</option><option value="all">All</option></select></label></div><div id="dropChart"></div><div style="height:18px"></div><div class="table-wrap"><table><thead><tr><th>Scenario</th><th>Phase</th><th>Dropped</th><th>Available</th><th>ROC-AUC</th><th>PR-AUC</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.scenario)}</td><td>${esc(r.phase)}</td><td>${esc(r.dropped_parties||'none')}</td><td>${esc(r.available_parties)}</td><td>${f(r.roc_auc)}</td><td>${f(r.pr_auc)}</td></tr>`).join('')}</tbody></table></div></div>`;
- const upd=()=>{const phase=document.querySelector('#dropPhase').value;const sub=phase==='all'?rows:rows.filter(r=>r.phase===phase);document.querySelector('#dropChart').innerHTML=chart(sub,'scenario',document.querySelector('#dropMetric').value)};document.querySelector('#dropMetric').onchange=upd;document.querySelector('#dropPhase').onchange=upd;upd();
-}
-function renderDrift(){
- const rows=DATA.feature_drift||[];
- document.querySelector('#drift').innerHTML=`<div class="grid"><div class="card"><h2>Controlled feature drift</h2><div class="sub">Mean, variance, missingness and categorical-frequency shifts are applied to selected synthetic parties.</div><div class="controls"><label>Metric <select id="driftMetric">${metricOptions()}</select></label></div><div id="driftChart"></div></div><div class="card"><h2>Scenario parameters</h2><div class="table-wrap"><table><thead><tr><th>Scenario</th><th>Party</th><th>Mean</th><th>Variance</th><th>Missingness</th><th>Category shift</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.scenario)}</td><td>${esc(r.party)}</td><td>${f(r.mean_shift,2)}</td><td>${f(r.variance_scale,2)}</td><td>${f(r.missingness_increase,2)}</td><td>${r.categorical_frequency_shift?'yes':'no'}</td></tr>`).join('')}</tbody></table></div></div></div>`;
- const upd=()=>document.querySelector('#driftChart').innerHTML=chart(rows,'scenario',document.querySelector('#driftMetric').value);document.querySelector('#driftMetric').onchange=upd;upd();
-}
-function renderSystems(){
- const rows=DATA.core_model_comparison||[];
- document.querySelector('#systems').innerHTML=`<div class="grid"><div class="card"><h2>Systems measurements</h2><div class="sub">Environment-dependent measurements from the publication runner. Compare within this run; do not treat them as hardware-independent performance claims.</div><div class="table-wrap"><table><thead><tr><th>Model</th><th>Train s</th><th>Infer s</th><th>Peak RSS</th><th>Comm.</th><th>Messages</th><th>Scalars</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.model)}</td><td>${f(r.training_seconds,3)}</td><td>${f(r.inference_seconds,3)}</td><td>${r.peak_rss_bytes?bytes(r.peak_rss_bytes):'—'}</td><td>${bytes(r.estimated_communication_bytes)}</td><td>${f(r.communication_message_count,0)}</td><td>${f(r.communication_scalar_count,0)}</td></tr>`).join('')}</tbody></table></div></div><div class="card"><h2>Provenance</h2><div class="metric-grid"><div class="metric"><b>${esc((DATA.source_commit||'').slice(0,7))}</b><span>Git source commit</span></div><div class="metric"><b>${esc(DATA.benchmark?.seed)}</b><span>fixed seed</span></div><div class="metric"><b>${esc(DATA.schema_version)}</b><span>payload schema</span></div></div><div style="height:15px"></div><div class="notice privacy">VertiMosaic demonstrates raw-feature locality in a research VFL simulator. It does not claim cryptographic privacy, PSI, MPC, homomorphic encryption, secure aggregation, collusion resistance, malicious-party security or formal differential privacy.</div><div style="height:12px"></div><div class="notice">This Space redistributes no UCI, OpenML or IEEE-CIS source rows. The separate four-industry external benchmark is semi-synthetic; those public datasets do not describe the same real individuals.</div></div></div>`;
-}
-function activateTabs(){document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.getElementById(btn.dataset.tab).classList.add('active')})}
-async function init(){activateTabs();try{const r=await fetch('data.json',{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);DATA=await r.json();document.querySelector('#loading').style.display='none';document.querySelector('#fact-core').textContent=f(DATA.benchmark?.core_rows,0);renderModels();renderParties();renderOverlap();renderDropout();renderDrift();renderSystems();document.querySelector('#footer').textContent=`Generated ${DATA.generated_at_utc||'—'} · source ${String(DATA.source_commit||'').slice(0,12)}`;}catch(e){document.querySelector('#loading').innerHTML='Unable to load benchmark evidence: '+esc(e.message)}}
-init();
-</script>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js" defer></script>
 </body>
 </html>
