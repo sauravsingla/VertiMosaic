@@ -106,6 +106,7 @@ jobs:
 
           card = (root / "README.md").read_text(encoding="utf-8")
           required_card_fragments = [
+              "license: apache-2.0",
               "pretty_name: VertiMosaic VFL Benchmark",
               "default: true",
               "path: data/core_model_comparison.parquet",
@@ -114,6 +115,7 @@ jobs:
               "path: data/party_dropout.parquet",
               "path: data/feature_drift.parquet",
               "https://huggingface.co/spaces/sauravsingla08/VertiMosaic",
+              "https://github.com/sauravsingla/VertiMosaic",
               "does **not** claim cryptographic security",
           ]
           missing = [fragment for fragment in required_card_fragments if fragment not in card]

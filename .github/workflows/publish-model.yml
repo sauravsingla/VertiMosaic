@@ -3,6 +3,17 @@ name: Publish VertiMosaic Model to Hugging Face
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-model.yml'
+      - 'huggingface/build_model.py'
+      - 'src/vertimosaic/datasets/synthetic.py'
+      - 'src/vertimosaic/evaluation/**'
+      - 'src/vertimosaic/experiments/pipeline.py'
+      - 'src/vertimosaic/models/**'
+      - 'src/vertimosaic/parties/**'
+      - 'pyproject.toml'
 
 permissions:
   id-token: write
@@ -116,13 +127,16 @@ jobs:
 
           card = (root / "README.md").read_text(encoding="utf-8")
           required_card_fragments = [
+              "license: apache-2.0",
               "library_name: vertimosaic",
+              "pipeline_tag: tabular-classification",
               "VertiMosaic VFL Reference Models",
               "800 aligned entities",
               "separate party shards",
               "not production models",
               "https://github.com/sauravsingla/VertiMosaic",
               "https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark",
+              "https://huggingface.co/spaces/sauravsingla08/VertiMosaic",
           ]
           missing_card = [fragment for fragment in required_card_fragments if fragment not in card]
           if missing_card:
