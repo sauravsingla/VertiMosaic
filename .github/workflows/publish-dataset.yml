@@ -49,6 +49,7 @@ jobs:
           SOURCE_SHA: ${{ github.sha }}
         run: |
           python huggingface/build_dataset.py --output hf-dataset
+          python huggingface/enrich_cards.py dataset --root hf-dataset
           find hf-dataset -maxdepth 3 -type f -print | sort
 
       - name: Validate Dataset Viewer configurations and provenance
