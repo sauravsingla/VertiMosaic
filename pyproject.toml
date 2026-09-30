@@ -50,6 +50,8 @@ Repository = "https://github.com/sauravsingla/VertiMosaic"
 Issues = "https://github.com/sauravsingla/VertiMosaic/issues"
 Dataset = "https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark"
 Space = "https://huggingface.co/spaces/sauravsingla08/VertiMosaic"
+Archive = "https://zenodo.org/records/23021923"
+DOI = "https://doi.org/10.5281/zenodo.23021923"
 
 [project.optional-dependencies]
 dev = [
