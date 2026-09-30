@@ -87,6 +87,44 @@ jobs:
           print("Validated VertiMosaic Space provenance and claim boundaries")
           PY
 
+      - name: Validate Hugging Face Space metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+
+          readme_path = Path("hf-space/README.md")
+          text = readme_path.read_text(encoding="utf-8")
+          parts = text.split("---", 2)
+          if len(parts) < 3 or parts[0].strip():
+              raise SystemExit("hf-space/README.md must start with YAML front matter")
+
+          metadata = yaml.safe_load(parts[1]) or {}
+          allowed_colors = {"red", "yellow", "green", "blue", "indigo", "purple", "pink", "gray"}
+          for field in ("colorFrom", "colorTo"):
+              value = metadata.get(field)
+              if value not in allowed_colors:
+                  raise SystemExit(f"{field} must be one of {sorted(allowed_colors)}; got {value!r}")
+
+          short_description = str(metadata.get("short_description", ""))
+          if not short_description:
+              raise SystemExit("short_description is required")
+          if len(short_description) > 60:
+              raise SystemExit(
+                  f"short_description must be <= 60 characters; got {len(short_description)}"
+              )
+
+          if metadata.get("sdk") != "static":
+              raise SystemExit("Space sdk must remain static")
+          app_file = metadata.get("app_file")
+          if not app_file or not (readme_path.parent / app_file).is_file():
+              raise SystemExit(f"Space app_file does not exist: {app_file!r}")
+
+          print("Validated Hugging Face Space README metadata")
+          PY
+
       - name: Install Hugging Face CLI
         run: |
           curl -LsSf https://hf.co/cli/install.sh | bash
