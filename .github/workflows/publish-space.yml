@@ -81,6 +81,8 @@ jobs:
           links = payload.get("links", {})
           if links.get("dataset") != "https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark":
               raise SystemExit("Space dataset cross-link is incorrect")
+          if links.get("model") != "https://huggingface.co/sauravsingla08/VertiMosaic-VFL-Reference-Models":
+              raise SystemExit("Space model cross-link is incorrect")
           if links.get("github") != "https://github.com/sauravsingla/VertiMosaic":
               raise SystemExit("Space GitHub cross-link is incorrect")
 
@@ -118,6 +120,14 @@ jobs:
 
           if metadata.get("sdk") != "static":
               raise SystemExit("Space sdk must remain static")
+
+          if metadata.get("models") != ["sauravsingla08/VertiMosaic-VFL-Reference-Models"]:
+              raise SystemExit("Space must declare the VertiMosaic reference model bundle")
+          if metadata.get("datasets") != ["sauravsingla08/VertiMosaic-VFL-Benchmark"]:
+              raise SystemExit("Space must declare the VertiMosaic benchmark dataset")
+          required_tags = {"vertical-federated-learning", "federated-learning", "tabular-classification"}
+          if not required_tags.issubset(set(metadata.get("tags", []))):
+              raise SystemExit("Space discovery tags are incomplete")
           app_file = metadata.get("app_file")
           if not app_file or not (readme_path.parent / app_file).is_file():
               raise SystemExit(f"Space app_file does not exist: {app_file!r}")

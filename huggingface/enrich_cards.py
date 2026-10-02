@@ -36,15 +36,21 @@ def _dataset_card(root: Path) -> str:
     return f"""---
 license: apache-2.0
 pretty_name: VertiMosaic VFL Benchmark
+task_categories:
+- tabular-classification
 tags:
 - vertical-federated-learning
 - federated-learning
 - tabular
+- tabular-classification
+- synthetic-data
+- benchmark
 - privacy-preserving-ml
 - distributed-machine-learning
 - ml-benchmark
 - reproducible-research
 - responsible-ai
+- cpu
 configs:
 - config_name: core-model-comparison
   default: true
@@ -179,16 +185,19 @@ license: apache-2.0
 library_name: vertimosaic
 pipeline_tag: tabular-classification
 tags:
+- vertimosaic
 - federated-learning
 - vertical-federated-learning
 - tabular
+- tabular-classification
 - cpu
 - reproducibility
+- reproducible-research
+- privacy-preserving-ml
 - privacy-research
+- synthetic-data
 - logistic-regression
 - gradient-boosting
-datasets:
-- {DATASET_ID}
 ---
 
 # VertiMosaic VFL Reference Models
@@ -203,6 +212,8 @@ This repository contains two research checkpoints generated from the VertiMosaic
 - `VFLHistGBDT` — vertical histogram gradient boosting with party-local routing state.
 
 They are deliberately small, inspectable reference artifacts rather than opaque production binaries.
+
+> **Dataset relationship:** the linked Hugging Face benchmark dataset contains generated evaluation summaries and robustness-study tables. It is **not** the row-level training corpus used to fit these checkpoints.
 
 ## At a glance
 

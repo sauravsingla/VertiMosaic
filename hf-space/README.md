@@ -8,6 +8,18 @@ app_file: index.html
 pinned: true
 license: apache-2.0
 short_description: Interactive VFL benchmark, robustness & provenance explorer
+models:
+- sauravsingla08/VertiMosaic-VFL-Reference-Models
+datasets:
+- sauravsingla08/VertiMosaic-VFL-Benchmark
+tags:
+- vertical-federated-learning
+- federated-learning
+- tabular
+- tabular-classification
+- model-benchmarking
+- privacy-preserving-ml
+- reproducible-research
 ---
 
 # VertiMosaic — Interactive VFL Evidence Explorer
@@ -31,6 +43,7 @@ The Space is static and browser-only. GitHub Actions regenerates `data.json` fro
 
 - **Source:** [sauravsingla/VertiMosaic](https://github.com/sauravsingla/VertiMosaic)
 - **Dataset:** [VertiMosaic-VFL-Benchmark](https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark)
+- **Models:** [VertiMosaic-VFL-Reference-Models](https://huggingface.co/sauravsingla08/VertiMosaic-VFL-Reference-Models)
 
 ## Privacy boundary
 

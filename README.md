@@ -16,8 +16,19 @@
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue" alt="Python 3.11 | 3.12">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue" alt="Apache-2.0"></a>
   <a href="https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-FFD21E" alt="Hugging Face Dataset"></a>
+  <a href="https://huggingface.co/sauravsingla08/VertiMosaic-VFL-Reference-Models"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-FFD21E" alt="Hugging Face Models"></a>
   <a href="https://huggingface.co/spaces/sauravsingla08/VertiMosaic"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Live%20Space-FFD21E" alt="Hugging Face Space"></a>
 </p>
+
+## Hugging Face ecosystem
+
+| Hub asset | Use it for |
+|---|---|
+| [🤗 Live Space — VertiMosaic VFL Research Explorer](https://huggingface.co/spaces/sauravsingla08/VertiMosaic) | Interactive model comparison, robustness, systems measurements and provenance |
+| [📊 Dataset — VertiMosaic-VFL-Benchmark](https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark) | Reproducible benchmark evidence and robustness-study tables |
+| [🧩 Models — VertiMosaic-VFL-Reference-Models](https://huggingface.co/sauravsingla08/VertiMosaic-VFL-Reference-Models) | Portable CPU reference checkpoints for VFL logistic regression and HistGBDT |
+
+The Space, dataset and model bundle are intentionally cross-linked and generated from this repository so users can move from **interactive exploration → evidence → checkpoints → source**.
 
 ## What VertiMosaic does
 
