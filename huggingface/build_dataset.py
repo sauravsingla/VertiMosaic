@@ -93,15 +93,21 @@ def _dataset_card() -> str:
     return """---
 license: apache-2.0
 pretty_name: VertiMosaic VFL Benchmark
+task_categories:
+- tabular-classification
 tags:
 - vertical-federated-learning
 - federated-learning
 - tabular
+- tabular-classification
+- synthetic-data
+- benchmark
 - privacy-preserving-ml
 - distributed-machine-learning
 - ml-benchmark
 - reproducible-research
 - responsible-ai
+- cpu
 configs:
 - config_name: core-model-comparison
   default: true
@@ -180,6 +186,7 @@ print(benchmark)
 ## Related artifacts
 
 - Interactive Space: https://huggingface.co/spaces/sauravsingla08/VertiMosaic
+- Reference models: https://huggingface.co/sauravsingla08/VertiMosaic-VFL-Reference-Models
 - Source repository: https://github.com/sauravsingla/VertiMosaic
 - Dataset: https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark
 
