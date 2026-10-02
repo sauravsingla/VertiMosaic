@@ -271,7 +271,9 @@ formal v0.3.0 release configuration: **800 aligned entities**, **seed 42**, a 70
 entity-level train/validation/test split, logistic `max_iter=150`, and GBDT
 `n_estimators=8`.
 
-> **Dataset relationship:** the Hugging Face benchmark dataset linked below contains generated evaluation evidence and robustness-study summaries. It is **not** the row-level training corpus used to fit these checkpoints.
+> **Dataset relationship:** the Hugging Face benchmark dataset linked below contains
+> generated evaluation evidence and robustness-study summaries. It is **not** the row-level
+> training corpus used to fit these checkpoints.
 
 ## Files
 
