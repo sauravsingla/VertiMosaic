@@ -109,6 +109,10 @@ jobs:
           required_card_fragments = [
               "license: apache-2.0",
               "pretty_name: VertiMosaic VFL Benchmark",
+              "task_categories:",
+              "- tabular-classification",
+              "- synthetic-data",
+              "https://huggingface.co/sauravsingla08/VertiMosaic-VFL-Reference-Models",
               "default: true",
               "path: data/core_model_comparison.parquet",
               "path: data/party_ablation.parquet",
