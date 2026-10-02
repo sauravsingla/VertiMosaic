@@ -123,6 +123,7 @@ def build(output: Path) -> None:
         "links": {
             "github": "https://github.com/sauravsingla/VertiMosaic",
             "dataset": "https://huggingface.co/datasets/sauravsingla08/VertiMosaic-VFL-Benchmark",
+            "model": "https://huggingface.co/sauravsingla08/VertiMosaic-VFL-Reference-Models",
             "space": "https://huggingface.co/spaces/sauravsingla08/VertiMosaic",
         },
         "benchmark": {
