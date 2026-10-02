@@ -144,6 +144,15 @@ jobs:
           if missing_card:
               raise SystemExit(f"model card contract missing: {missing_card}")
 
+          front_matter = card.split("---", 2)[1]
+          if "datasets:" in front_matter:
+              raise SystemExit(
+                  "benchmark summary dataset must not be declared as model training data"
+              )
+          for fragment in ("- vertimosaic", "- tabular-classification", "- synthetic-data"):
+              if fragment not in front_matter:
+                  raise SystemExit(f"model discovery metadata missing: {fragment}")
+
           print("Validated VertiMosaic Hugging Face model bundle and provenance")
           PY
 
