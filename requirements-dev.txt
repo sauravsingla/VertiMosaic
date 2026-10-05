@@ -2,11 +2,11 @@
 pytest>=9.0.3,<10
 pytest-cov>=6,<8
 ruff>=0.6,<1
-mypy>=1.10,<2
+mypy>=1.10,<3
 types-PyYAML>=6.0.12,<7
 build>=1.2,<2
-twine>=5,<7
+twine>=5,<8
 bandit>=1.7,<2
 pip-audit>=2.7,<3
 pre-commit>=3.7,<5
-cyclonedx-bom>=4,<7
+cyclonedx-bom>=4,<8
